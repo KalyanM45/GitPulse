@@ -196,11 +196,13 @@ function skeleton() {
 }
 
 function userGrid(list) {
+  const now = Date.now()
   return `<div class="user-grid">${list.map(u => {
-    const isNew = u.is_initial === false
-    const label = isNew
-      ? `<div class="u-since u-new">Followed ${fmtShort(u.captured_at)}</div>`
-      : `<div class="u-since">Existing</div>`
+    const followedAt = u.captured_at ? new Date(u.captured_at).getTime() : 0
+    const isNew = u.is_initial === false && (now - followedAt) < 24 * 60 * 60 * 1000
+    const label = (u.is_initial === false)
+      ? `<div class="u-since${isNew ? ' u-new' : ''}">${fmtShort(u.captured_at)}</div>`
+      : `<div class="u-since">—</div>`
     return `<a class="u-card${isNew ? ' u-card-new' : ''}" href="${u.html_url}" target="_blank" rel="noopener noreferrer">
       <img src="${u.avatar_url}" alt="${u.login}" loading="lazy"/>
       <div class="u-text">

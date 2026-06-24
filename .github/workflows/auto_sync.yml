@@ -2,8 +2,8 @@ name: GitPulse — Nightly Sync
 
 on:
   schedule:
-    # 18:30 UTC = 00:00 IST (UTC+5:30)
-    - cron: '30 18 * * *'
+    # 18:15 UTC = 23:45 IST (UTC+5:30) — syncs before midnight so events log on the correct day
+    - cron: '15 18 * * *'
   workflow_dispatch:
     # Also allows manual trigger from GitHub Actions UI
 
