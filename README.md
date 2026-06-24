@@ -8,15 +8,9 @@
 
 ## About The Project
 
-GitHub is one of the most active developer communities in the world, yet the platform provides almost no visibility into your social graph. You can see a count of your followers, but you cannot see when someone followed you, when someone unfollowed you, or track how your audience has grown or shrunk over time. There is no notification when someone unfollows you, no history of changes, and no way to distinguish between someone who followed you last year and someone who followed you this morning. For developers who actively share projects, write technical content, or build in public, this lack of visibility is a real gap.
+GitPulse is a full-stack GitHub audience tracker built with FastAPI and MongoDB. On every sync it fetches your followers and following from the GitHub REST API, diffs them against the stored snapshot in MongoDB, and logs every change as a timestamped event. The event log is append-only so the full history is always preserved.
 
-GitPulse is a self-hosted, full-stack audience analytics tool built specifically to close that gap. It connects to the GitHub REST API using your personal access token, pulls your complete followers and following lists, and stores a snapshot of the state in MongoDB. Every time a sync runs — either manually via the dashboard or automatically via GitHub Actions at 11:45 PM IST every day — GitPulse compares the live GitHub data against the stored snapshot. Anyone new is recorded as a "followed" event with a precise timestamp. Anyone missing from the new snapshot is recorded as an "unfollowed" event and removed from the current view. This event log is permanent and never deleted, giving you a complete and auditable history of every change to your audience over time.
-
-The dashboard is organized into three views. **Following You** shows every person currently in your audience, sorted so the most recently followed appear at the top — new followers are highlighted with a green border so they stand out immediately. **You Follow** shows everyone you are currently following, in the exact order GitHub returns them. **Lost Followers** shows people who unfollowed you and have not come back, each with the date they dropped off. Every user in every view has a history button that opens a timeline of all their activity — if someone followed, unfollowed, and followed again, all three events appear in chronological order with timestamps in IST.
-
-The sync architecture is designed to be reliable without requiring the backend server to always be running. The nightly GitHub Actions workflow runs a standalone Python script that imports the sync logic directly and talks to MongoDB Atlas without making any HTTP requests to the backend. This means the sync happens reliably at 11:45 PM IST every single day regardless of whether Render has spun down the free-tier server due to inactivity. The backend only needs to be awake when you open the dashboard in your browser. When you do open it, Render wakes the server within about 30 seconds and all data loads from MongoDB.
-
-The frontend is intentionally built as plain HTML, CSS, and JavaScript with no framework and no build step. This keeps the deployment simple — Vercel serves the static files as-is — and means the project has zero frontend dependencies that can go stale. The backend is FastAPI with PyMongo, chosen for their simplicity and performance. All timestamps are stored as UTC in MongoDB and converted to IST at display time, so the data is timezone-correct regardless of where the server is hosted.
+The dashboard has three views — current followers newest first, current following in GitHub order, and lost followers built from a MongoDB aggregation that deduplicates by user and excludes anyone who has re-followed. A daily cron job via GitHub Actions keeps everything up to date automatically.
 
 ## Library Requirements
 
@@ -205,10 +199,6 @@ Contributions are what make the open-source community such an amazing place to l
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
-
-## Contact Details
-
-Hema Kalyan Murapaka — [kalyanmurapaka274@gmail.com](mailto:kalyanmurapaka274@gmail.com)
 
 ## Acknowledgements
 
