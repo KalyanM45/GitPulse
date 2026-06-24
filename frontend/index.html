@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GitPulse — GitHub Analytics</title>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="prog"></div>
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────── -->
+<aside id="sidebar">
+
+  <!-- Brand -->
+  <div class="sb-brand">
+    <div class="sb-brand-logo">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      </div>
+      <span>Git<span style="background:linear-gradient(90deg,#4f8ef7,#a371f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Pulse</span></span>
+    </div>
+
+    <!-- GitHub profile card -->
+    <div class="profile-card">
+      <div class="profile-avatar-wrap">
+        <img id="p-avatar" src="https://github.com/identicons/user.png" alt="avatar"/>
+        <div class="online-dot"></div>
+      </div>
+      <div class="profile-name" id="p-name">Loading…</div>
+      <div class="profile-username" id="p-username">@—</div>
+      <div class="profile-bio" id="p-bio" style="display:none"></div>
+      <div class="profile-stats">
+        <div class="ps-item">
+          <div class="ps-val" id="ps-repos">—</div>
+          <div class="ps-lbl">Repos</div>
+        </div>
+        <div class="ps-item">
+          <div class="ps-val" id="ps-followers">—</div>
+          <div class="ps-lbl">Followers</div>
+        </div>
+        <div class="ps-item">
+          <div class="ps-val" id="ps-following">—</div>
+          <div class="ps-lbl">Following</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <nav class="sb-nav">
+    <div class="sb-section-label">Analytics</div>
+
+    <button class="nav-item active" onclick="selectFeature('audience', this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      <span class="nav-label">Audience</span>
+      <span class="nav-badge">Live</span>
+    </button>
+
+    <div class="sb-divider"></div>
+    <div class="sb-section-label">Coming Soon</div>
+
+    <button class="nav-item coming">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
+      </svg>
+      <span class="nav-label">Repositories</span>
+      <span class="nav-tag">Soon</span>
+    </button>
+
+    <button class="nav-item coming">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+      <span class="nav-label">Stars</span>
+      <span class="nav-tag">Soon</span>
+    </button>
+
+    <button class="nav-item coming">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+      </svg>
+      <span class="nav-label">Contributions</span>
+      <span class="nav-tag">Soon</span>
+    </button>
+
+  </nav>
+</aside>
+
+<!-- ── Main App ────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- Top bar -->
+  <header id="topbar">
+    <div class="topbar-title">
+      Audience Analytics
+      <span>Who's following you &amp; who dropped off</span>
+    </div>
+    <button id="sync-btn" onclick="syncNow()">
+      <svg id="i-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="display:none">
+        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+      </svg>
+      <svg id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14" style="display:none">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      <svg id="i-def" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+      </svg>
+      <span id="btn-label">Sync Now</span>
+    </button>
+  </header>
+
+  <!-- Content -->
+  <div id="main">
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-card c-blue" onclick="switchView('followers')" style="cursor:pointer">
+        <div class="stat-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-lbl">Your Audience</div>
+          <div class="stat-val" id="st-followers">—</div>
+        </div>
+      </div>
+      <div class="stat-card c-green" onclick="switchView('following')" style="cursor:pointer">
+        <div class="stat-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <line x1="19" y1="8" x2="19" y2="14"/>
+            <line x1="22" y1="11" x2="16" y2="11"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-lbl">Following</div>
+          <div class="stat-val" id="st-following">—</div>
+        </div>
+      </div>
+      <div class="stat-card c-red" onclick="switchView('unfollowed')" style="cursor:pointer">
+        <div class="stat-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <line x1="22" y1="11" x2="16" y2="11"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-lbl">Lost Followers</div>
+          <div class="stat-val" id="st-unfollowed">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sub-tabs -->
+    <div class="sub-tabs">
+      <button class="sub-tab active" data-view="followers" onclick="switchView('followers')">
+        Following You <span class="count">—</span>
+      </button>
+      <button class="sub-tab" data-view="following" onclick="switchView('following')">
+        You Follow <span class="count">—</span>
+      </button>
+      <button class="sub-tab" data-view="unfollowed" onclick="switchView('unfollowed')">
+        Lost Followers <span class="count">—</span>
+      </button>
+    </div>
+
+    <!-- View header -->
+    <div class="view-header">
+      <h2 id="view-title">Following You</h2>
+      <p id="view-desc">People who are currently following you on GitHub</p>
+    </div>
+
+    <!-- Search bar -->
+    <div class="search-wrap">
+      <span class="search-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </span>
+      <input
+        id="search-input"
+        class="search-input"
+        type="text"
+        placeholder="Search by username…"
+        oninput="onSearch(this.value)"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="search-clear" id="search-clear" onclick="clearSearch()" title="Clear">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Search meta / result info -->
+    <div class="search-meta" id="search-meta" style="display:none">
+      <div class="search-result-count">
+        <div class="search-spinner" id="search-spinner"></div>
+        <span id="search-result-text"></span>
+      </div>
+    </div>
+
+    <!-- Dynamic content -->
+    <div id="content"></div>
+
+    <!-- Pagination -->
+    <div class="pages" id="pages" style="display:none">
+      <button class="pg-btn" id="pg-prev" onclick="changePage(-1)">← Prev</button>
+      <span class="pg-info" id="pg-info"></span>
+      <button class="pg-btn" id="pg-next" onclick="changePage(1)">Next →</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── History Modal ───────────────────────────────────────────── -->
+<div class="overlay" id="modal" style="display:none" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>History · <em id="modal-login"></em></h3>
+      <button class="modal-close" onclick="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+  function selectFeature(feature, btn) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+    btn.classList.add('active')
+    // future: switch feature panels
+  }
+</script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

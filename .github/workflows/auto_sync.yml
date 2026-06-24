@@ -1,0 +1,38 @@
+name: GitPulse — Nightly Sync
+
+on:
+  schedule:
+    # 18:30 UTC = 00:00 IST (UTC+5:30)
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+    # Also allows manual trigger from GitHub Actions UI
+
+jobs:
+  sync:
+    name: Sync followers & following
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run sync
+        env:
+          # Name your repo secret GH_ANALYTICS_TOKEN (not GITHUB_TOKEN — that's reserved by GHA)
+          # and map it here so the backend code sees GITHUB_TOKEN
+          GITHUB_TOKEN: ${{ secrets.GH_ANALYTICS_TOKEN }}
+          GITHUB_USERNAME: ${{ secrets.GH_USERNAME }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: python scripts/sync.py
