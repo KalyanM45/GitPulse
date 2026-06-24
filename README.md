@@ -124,17 +124,25 @@ Open `frontend/index.html` directly in your browser — no dev server needed.
 ### Backend → Render
 
 1. Push this repo to GitHub
-2. Go to [render.com](https://render.com) → New → **Blueprint**
-3. Select this repo — Render reads `render.yaml` automatically
-4. Add these environment variables in the Render dashboard:
+2. Go to [render.com](https://render.com) → New → **Web Service** → connect your repo
+3. Set the following in the form:
+
+| Field | Value |
+|-------|-------|
+| Runtime | Python 3 |
+| Build Command | `pip install -r backend/requirements.txt` |
+| Start Command | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+
+4. Add these environment variables:
 
 | Key | Value |
 |-----|-------|
 | `GITHUB_TOKEN` | Your GitHub personal access token |
 | `GITHUB_USERNAME` | Your GitHub username |
 | `MONGODB_URI` | Your MongoDB Atlas URI |
+| `DB_NAME` | `github_analytics` |
 
-5. Deploy — Render gives you a URL like `https://gitpulse-api.onrender.com`
+5. Click Deploy — Render gives you a URL like `https://gitpulse-api.onrender.com`
 
 ### Frontend → Vercel
 
