@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
 from ..services import follower_service, following_service
+from ..services import repo_service, contributions_service
 from ..services.github_service import fetch_my_profile
 
 router = APIRouter(prefix="/api", tags=["analytics"])
@@ -17,8 +18,15 @@ def get_profile():
 def trigger_sync():
     try:
         followers_result = follower_service.sync_followers()
-        following_count = following_service.sync_following()
-        return {**followers_result, "total_following": following_count}
+        following_count  = following_service.sync_following()
+        repo_result      = repo_service.sync_repos()
+        contrib_result   = contributions_service.sync_contributions()
+        return {
+            **followers_result,
+            "total_following":    following_count,
+            "total_repos":        repo_result["total_repos"],
+            "total_contributions": contrib_result["total_contributions"],
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

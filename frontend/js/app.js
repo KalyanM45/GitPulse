@@ -4,6 +4,38 @@ let page = 1, totalItems = 0, searchQuery = ''
 const PER = 30
 let searchTimer = null
 
+// ── Feature switching ─────────────────────────────────────────────────────────
+
+let activeFeature = 'audience'
+let reposInitialized = false
+
+function selectFeature(feature, btn) {
+  activeFeature = feature
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+  btn.classList.add('active')
+
+  const panels = { audience: 'main', repos: 'repos-main', contributions: 'contrib-main' }
+  Object.values(panels).forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none' })
+  const target = document.getElementById(panels[feature] || 'main')
+  if (target) target.style.display = 'block'
+
+  const titles = {
+    audience:      ['Audience Analytics', "Who's following you &amp; who dropped off"],
+    repos:         ['Repo Analytics',     'Your GitHub repositories at a glance'],
+    contributions: ['Contributions',      'Your coding activity over the past year'],
+  }
+  const [title, desc] = titles[feature] || titles.audience
+  document.querySelector('.topbar-title').innerHTML = `${title}<span>${desc}</span>`
+  document.getElementById('btn-label').textContent = 'Sync Now'
+
+  if (feature === 'repos' && !reposInitialized) { reposInitialized = true; initRepos() }
+  if (feature === 'contributions') initContributions()
+}
+
+function syncActive() {
+  syncNow()
+}
+
 // ── URL state ─────────────────────────────────────────────────────────────────
 
 function pushURL(view, p) {
@@ -303,10 +335,15 @@ async function syncNow() {
     const parts = [`${d.total_followers} followers`]
     if (d.new_followers)  parts.push(`+${d.new_followers} gained`)
     if (d.lost_followers) parts.push(`-${d.lost_followers} unfollowed`)
+    parts.push(`${d.total_repos} repos`)
+    if (d.total_contributions) parts.push(`${d.total_contributions} contributions`)
     showToast(parts.join(' · '))
 
+    // Refresh whichever panel is visible
     loadStats()
     renderContent()
+    if (activeFeature === 'repos') { reposInitialized = false; initRepos() }
+    if (activeFeature === 'contributions') initContributions()
 
     setTimeout(() => {
       chk.style.display = 'none'; def.style.display = 'inline-block'

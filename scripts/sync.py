@@ -15,6 +15,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", "backend", ".env"))
 
 from app.services.follower_service import sync_followers
 from app.services.following_service import sync_following
+from app.services.repo_service import sync_repos
+from app.services.contributions_service import sync_contributions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,6 +52,20 @@ def main():
         log.info("Following synced — total: %d", following_count)
     except Exception as e:
         log.error("Following sync failed: %s", e)
+        sys.exit(1)
+
+    try:
+        repo_result = sync_repos()
+        log.info("Repos synced — total: %d", repo_result["total_repos"])
+    except Exception as e:
+        log.error("Repo sync failed: %s", e)
+        sys.exit(1)
+
+    try:
+        contrib_result = sync_contributions()
+        log.info("Contributions synced — total: %d", contrib_result["total_contributions"])
+    except Exception as e:
+        log.error("Contributions sync failed: %s", e)
         sys.exit(1)
 
     log.info("Sync complete.")

@@ -1,14 +1,10 @@
-name: GitPulse — Nightly Sync
+name: Sync Workflow
 
 on:
   schedule:
-    - cron: '30 2 * * *'   #  8:00 AM IST
     - cron: '30 5 * * *'   # 11:00 AM IST
-    - cron: '30 8 * * *'   #  2:00 PM IST
     - cron: '30 11 * * *'  #  5:00 PM IST
-    - cron: '30 14 * * *'  #  8:00 PM IST
     - cron: '30 17 * * *'  # 11:00 PM IST
-    - cron: '30 20 * * *'  #  2:00 AM IST
     - cron: '30 23 * * *'  #  5:00 AM IST
   workflow_dispatch:
 

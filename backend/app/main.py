@@ -2,6 +2,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes.followers import router as followers_router
+from .routes.repos import router as repos_router
+from .routes.contributions import router as contributions_router
 from .scheduler import start_scheduler, stop_scheduler
 from .database import close_db
 
@@ -24,6 +26,8 @@ app.add_middleware(
 )
 
 app.include_router(followers_router)
+app.include_router(repos_router)
+app.include_router(contributions_router)
 
 
 @app.get("/health")
