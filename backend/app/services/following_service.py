@@ -9,7 +9,15 @@ def _col():
 
 def sync_following() -> int:
     raw = fetch_all_following()
+
     col = _col()
+    existing_count = col.count_documents({})
+    if not raw and existing_count > 0:
+        raise RuntimeError(
+            f"GitHub returned 0 following but {existing_count} records exist — "
+            "aborting to protect existing data"
+        )
+
     col.drop()
     if raw:
         now = datetime.now(timezone.utc)

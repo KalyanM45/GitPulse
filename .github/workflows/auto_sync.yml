@@ -2,10 +2,15 @@ name: GitPulse — Nightly Sync
 
 on:
   schedule:
-    # 18:15 UTC = 23:45 IST (UTC+5:30) — syncs before midnight so events log on the correct day
-    - cron: '15 18 * * *'
+    - cron: '30 2 * * *'   #  8:00 AM IST
+    - cron: '30 5 * * *'   # 11:00 AM IST
+    - cron: '30 8 * * *'   #  2:00 PM IST
+    - cron: '30 11 * * *'  #  5:00 PM IST
+    - cron: '30 14 * * *'  #  8:00 PM IST
+    - cron: '30 17 * * *'  # 11:00 PM IST
+    - cron: '30 20 * * *'  #  2:00 AM IST
+    - cron: '30 23 * * *'  #  5:00 AM IST
   workflow_dispatch:
-    # Also allows manual trigger from GitHub Actions UI
 
 jobs:
   sync:
@@ -15,10 +20,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip

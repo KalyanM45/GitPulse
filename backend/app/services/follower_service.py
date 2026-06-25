@@ -45,6 +45,12 @@ def sync_followers() -> dict:
     stored = {doc["login"]: doc for doc in _snapshots_col().find({}, {"_id": 0})}
     stored_logins = set(stored.keys())
 
+    if not current_logins and stored_logins:
+        raise RuntimeError(
+            f"GitHub returned 0 followers but {len(stored_logins)} are stored — "
+            "aborting to protect existing data"
+        )
+
     new_followers = current_logins - stored_logins
     lost_followers = stored_logins - current_logins
     is_first_sync = len(stored_logins) == 0
