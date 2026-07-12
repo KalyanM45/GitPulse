@@ -6,6 +6,7 @@ from .routes.repos import router as repos_router
 from .routes.contributions import router as contributions_router
 from .scheduler import start_scheduler, stop_scheduler
 from .database import close_db
+from .config import CORS_ORIGINS
 
 
 @asynccontextmanager
@@ -20,7 +21,7 @@ app = FastAPI(title="GitHub Analytics API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

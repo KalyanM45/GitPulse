@@ -1,12 +1,30 @@
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# backend/.env holds GITHUB_TOKEN (repo scope) and the MongoDB Atlas URI.
+# Ignore every env file; .env.example is the documented exception.
+.env
+.env.*
+!.env.example
+
+# ── Python ────────────────────────────────────────────────────────────────────
 backend/venv/
-backend/.env
 **/__pycache__/
-**/*.pyc
-**/*.pyo
-backend/.env
-.DS_Store
+**/*.py[cod]
 *.egg-info/
 .pytest_cache/
+
+# ── Node / Next ───────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# ── Build / tooling ───────────────────────────────────────────────────────────
 dist/
 build/
 .vercel/
+shots/
+*.log
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

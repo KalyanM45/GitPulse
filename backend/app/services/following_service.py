@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from ..database import get_db
-from .github_service import fetch_all_following
+from .github_service import fetch_all_following, fetch_user_profiles
 
 
 def _col():
@@ -21,9 +21,15 @@ def sync_following() -> int:
     col.drop()
     if raw:
         now = datetime.now(timezone.utc)
+        try:
+            names = fetch_user_profiles([u["login"] for u in raw])
+        except Exception:
+            names = {}
         col.insert_many([
             {
+                "github_id": u["id"],
                 "login": u["login"],
+                "name": names.get(u["login"], ""),
                 "avatar_url": u["avatar_url"],
                 "html_url": u["html_url"],
                 "captured_at": now,
@@ -31,7 +37,8 @@ def sync_following() -> int:
             }
             for idx, u in enumerate(raw)
         ])
-    col.create_index("login", unique=True)
+    col.create_index("github_id", unique=True)
+    col.create_index("login")
     return len(raw)
 
 

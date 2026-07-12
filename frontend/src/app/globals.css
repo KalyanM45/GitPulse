@@ -1,0 +1,287 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GitPulse design tokens
+   Dark-first. Every value here is a decision; nothing is a Tailwind default.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Surfaces — three depths, near-black to elevated */
+  --color-base: #05070a;
+  --color-surface: #0b0f14;
+  --color-elevated: #111827;
+
+  /* Glass — the only card fill in the system */
+  --color-glass: rgb(255 255 255 / 0.04);
+  --color-glass-hover: rgb(255 255 255 / 0.06);
+  --color-hairline: rgb(255 255 255 / 0.08);
+  --color-hairline-strong: rgb(255 255 255 / 0.14);
+
+  /* Text — measured against --color-base:
+     primary 21:1 · secondary 11:1 · tertiary 6.75:1 — all WCAG AA */
+  --color-ink: #ffffff;
+  --color-ink-2: #b8c0cc;
+  --color-ink-3: #8b96a8;
+
+  /* Brand */
+  --color-indigo: #4f46e5;
+  --color-indigo-2: #6366f1;
+  --color-indigo-lift: #818cf8; /* 6.77:1 — the only indigo safe as text */
+  --color-violet: #8b5cf6;
+  --color-sky: #38bdf8;
+
+  /* Semantic */
+  --color-positive: #34d399;
+  --color-negative: #fb7185;
+  --color-warning: #fbbf24;
+
+  /* Radii — 18–24px on panels, tight on controls */
+  --radius-control: 10px;
+  --radius-card: 18px;
+  --radius-panel: 24px;
+
+  /* Type */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+
+  /* Motion — one spring vocabulary, used everywhere */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+
+* {
+  border-color: var(--color-hairline);
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Kill the scroll-anchor jump when React Query swaps skeleton → data */
+  overflow-anchor: none;
+}
+
+body {
+  background: var(--color-base);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01", "ss03";
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numeric UI (KPIs, counts, table cells) must not shift width while animating */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ── Focus: visible, branded, never on mouse click ─────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--color-indigo-lift);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.08);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.16);
+  background-clip: content-box;
+}
+
+::selection {
+  background: rgb(99 102 241 / 0.32);
+  color: #fff;
+}
+
+/* ── Utilities ─────────────────────────────────────────────────────────────── */
+
+@utility glass {
+  background: var(--color-glass);
+  border: 1px solid var(--color-hairline);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+
+/* The specular highlight along a panel's top edge. This is what sells "glass"
+   far more than blur does — light catching a bevel. */
+@utility glass-sheen {
+  position: relative;
+}
+@utility glass-sheen-before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.14),
+    rgb(255 255 255 / 0.02) 30%,
+    transparent 60%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+@utility text-gradient {
+  background: linear-gradient(135deg, #fff 0%, #fff 40%, var(--color-ink-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+@utility text-gradient-brand {
+  background: linear-gradient(120deg, #818cf8 0%, #a78bfa 45%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Fine grain over gradients — stops large color fields from banding on OLED */
+@utility noise {
+  position: relative;
+}
+
+/* ── Keyframes ─────────────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes mesh-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(3%, -4%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-3%, 3%, 0) scale(0.95);
+  }
+}
+
+@keyframes gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Button ripple — expands from the exact click point, fades as it grows. */
+@keyframes ripple {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0.4;
+    transform: translate(-50%, -50%);
+  }
+  100% {
+    width: 320px;
+    height: 320px;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-mesh-drift {
+  animation: mesh-drift 22s var(--ease-in-out-quint) infinite;
+  will-change: transform;
+}
+
+.animate-gradient-pan {
+  background-size: 200% 200%;
+  animation: gradient-pan 6s ease infinite;
+}
+
+/* Loading shimmer — a sweep, not an opacity blink */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.05),
+    transparent
+  );
+  animation: shimmer 1.8s infinite;
+}
+
+/* ── Reduced motion: honour it for real ─────────────────────────────────────
+   Two sources: the OS setting, and the in-app Settings toggle (which stamps
+   data-motion="off" on <html>). Both collapse animation to nothing. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .shimmer::after {
+    animation: none;
+  }
+}
+
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion="off"] .shimmer::after {
+  animation: none;
+}

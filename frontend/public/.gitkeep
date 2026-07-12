@@ -1,0 +1,2 @@
+# Static assets served at the site root. Kept so the Docker build's
+# `COPY /app/public` step has something to copy.

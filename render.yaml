@@ -1,0 +1,37 @@
+# Render blueprint for the GitPulse API (Docker).
+#
+# Render → New → Blueprint → point at this repo. Secrets are marked sync:false,
+# so Render prompts for them instead of reading them from git.
+
+services:
+  - type: web
+    name: gitpulse-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    envVars:
+      # Never commit these — Render asks for them on first deploy.
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_USERNAME
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+
+      - key: DB_NAME
+        value: github_analytics
+      - key: SYNC_INTERVAL_MINUTES
+        value: "60"
+
+      # Lock the API to the frontend's origin. Replace with your Vercel domain;
+      # keep localhost so you can point a local frontend at the deployed API.
+      - key: CORS_ORIGINS
+        value: https://gitpulse.vercel.app,http://localhost:3000
+
+# NOTE: Render's free plan spins the service down after ~15 minutes idle, and a
+# cold start takes ~50s. The in-process APScheduler sync only runs while the
+# service is awake, so on the free plan syncs will be irregular. Use a paid
+# instance, or trigger POST /api/sync from an external cron, if that matters.

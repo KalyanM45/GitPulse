@@ -1,0 +1,48 @@
+# GitPulse — one command to run the whole app.
+#
+#   docker compose up --build     first time (or after a code change)
+#   docker compose up             every time after that
+#   docker compose down           stop
+#
+# Then open http://localhost:3000
+#
+# MongoDB is not a service here: backend/.env points at MongoDB Atlas, which is
+# already remote. Nothing to run locally.
+
+services:
+  api:
+    build: ./backend
+    container_name: gitpulse-api
+    # GITHUB_TOKEN, MONGODB_URI, DB_NAME, SYNC_INTERVAL_MINUTES all come from here.
+    env_file: ./backend/.env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # The browser calls the API directly from your machine, so this is
+        # localhost — not the `api` service name, which only resolves inside
+        # Docker's network and would fail in the browser.
+        NEXT_PUBLIC_API_BASE: http://localhost:8000
+    container_name: gitpulse-web
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy

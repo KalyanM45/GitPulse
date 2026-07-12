@@ -1,0 +1,18 @@
+# Secrets and local-only env. NEXT_PUBLIC_API_BASE is passed as a build ARG
+# instead, so .env.local must not leak in and override it.
+.env
+.env.*
+!.env.example
+
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Build/tooling artefacts that have no place in the image
+shots/
+scripts/
+.vercel/
+Dockerfile
+.dockerignore
+*.md

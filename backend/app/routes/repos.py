@@ -25,8 +25,24 @@ def list_repos(
     page: int = Query(1, ge=1),
     per_page: int = Query(30, ge=1, le=100),
     search: str = Query(""),
+    sort: str = Query("pushed_at"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
+    visibility: str = Query("all", pattern="^(all|public|private)$"),
 ):
-    return repo_service.get_repos(page=page, per_page=per_page, search=search)
+    return repo_service.get_repos(
+        page=page,
+        per_page=per_page,
+        search=search,
+        sort=sort,
+        order=order,
+        visibility=visibility,
+    )
+
+
+@router.get("/repos/{name}/traffic")
+def repo_traffic(name: str):
+    """Day-wise traffic history — everything we have accumulated, not just 14 days."""
+    return repo_service.get_traffic_series(name)
 
 
 @router.get("/repos/{name}/star-history")
