@@ -1,9 +1,10 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { TooltipProvider } from "@/components/ui/overlays";
 import { ApiError } from "@/lib/api";
+import { persistCache, restoreCache } from "@/lib/persist";
 import { PrefsProvider } from "@/lib/prefs";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -21,8 +22,19 @@ export function Providers({ children }: { children: ReactNode }) {
              * race guard was doing by hand.
              */
             staleTime: 60_000,
-            gcTime: 5 * 60_000,
-            refetchOnWindowFocus: false,
+            /**
+             * Long, because the cache now outlives the tab (see lib/persist).
+             * The old 5 minutes would have evicted a restored entry almost
+             * immediately, so the restore would have bought nothing.
+             */
+            gcTime: 24 * 60 * 60_000,
+            /**
+             * On, because syncs happen outside the browser — the cron runs four
+             * times a day and the scheduler hourly. Coming back to a tab is the
+             * clearest signal that what is on screen may be old. staleTime above
+             * keeps this from firing on every alt-tab.
+             */
+            refetchOnWindowFocus: true,
             retry: (failureCount, error) => {
               // Don't retry a 404 — the resource genuinely isn't there.
               if (error instanceof ApiError && error.status === 404) return false;
@@ -32,6 +44,17 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }),
   );
+
+  /**
+   * Restore in an effect rather than in the `useState` initialiser: the initialiser
+   * also runs during SSR-less prerender, and filling the cache before hydration
+   * would make the client's first render disagree with the server's markup. Running
+   * a tick later costs one frame of skeleton and keeps hydration clean.
+   */
+  useEffect(() => {
+    restoreCache(client);
+    return persistCache(client);
+  }, [client]);
 
   return (
     <QueryClientProvider client={client}>

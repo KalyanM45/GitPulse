@@ -1,0 +1,70 @@
+# Keeps the Render service from going to sleep.
+#
+# The API runs on Render's free plan, which spins the instance down after ~15
+# minutes with no traffic and takes roughly 50 seconds to boot again. That cold
+# start is, by a wide margin, the slowest thing about opening the dashboard — no
+# amount of query tuning competes with a process that is not running yet.
+#
+# A request every ~10 minutes keeps it in memory. /health is deliberately trivial
+# (it does not touch MongoDB), so this costs the service nothing.
+#
+# ── Before this does anything, set the repo variable ──────────────────────────
+#   Settings → Secrets and variables → Actions → Variables → New variable
+#   Name:  API_BASE_URL      Value: https://<your-service>.onrender.com
+# Without it the job exits successfully without pinging, so a fork or a clone
+# does not fail CI.
+#
+# ── Two caveats worth knowing ─────────────────────────────────────────────────
+# 1. GitHub does not guarantee cron punctuality. Scheduled workflows are queued at
+#    low priority and under load routinely run 10-30 minutes late, which is longer
+#    than Render's idle timeout — so this reduces cold starts, it does not
+#    eliminate them. For reliable pinging use an external service (cron-job.org
+#    and UptimeRobot both do 5-minute intervals free), or move off the free plan.
+# 2. GitHub disables scheduled workflows in repositories with no commits for 60
+#    days. If syncs and pings both stop, that is the first thing to check.
+#
+# Staying awake around the clock uses ~730 of the free plan's 750 instance-hours
+# per month, which is fine for one service and not for two.
+
+name: Keep API Warm
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+# A backed-up queue should ping once, not replay every missed slot.
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping /health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "API_BASE_URL variable is not set — nothing to ping. See this file's header."
+            exit 0
+          fi
+
+          # --max-time 90 because a cold start is the case this exists to cover:
+          # if the service *had* gone to sleep, this request is the one paying to
+          # wake it, and curl's default would give up before it finished booting.
+          # --retry rides out a boot that takes longer than that.
+          code=$(curl -sS -o /dev/stderr -w '%{http_code}' \
+                      --max-time 90 --retry 2 --retry-delay 15 --retry-all-errors \
+                      "${API_BASE_URL%/}/health") || {
+            echo "::warning::Ping failed — the service may be down or still booting."
+            exit 0
+          }
+
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::warning::/health returned $code"
+          fi

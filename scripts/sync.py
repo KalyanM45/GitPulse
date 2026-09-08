@@ -13,10 +13,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "backend", ".env"))
 
+from app.indexes import ensure_indexes
 from app.services.follower_service import sync_followers
 from app.services.following_service import sync_following
 from app.services.repo_service import sync_repos
 from app.services.contributions_service import sync_contributions
+from app.services.profile_service import get_profile
+from app.services.sync_state import mark_synced
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +37,19 @@ def main():
         sys.exit(1)
 
     log.info("Starting sync at %s UTC", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+
+    # The API creates these at startup; this process never boots the API, so
+    # without it a scheduled run can write into unindexed collections — including
+    # the uniques the upserts rely on.
+    ensure_indexes()
+
+    # Refresh the cached profile that GET /api/profile serves, so the dashboard is
+    # not the thing that has to go and fetch it.
+    try:
+        get_profile(force=True)
+        log.info("Profile refreshed.")
+    except Exception as e:
+        log.warning("Profile refresh failed (non-fatal): %s", e)
 
     try:
         result = sync_followers()
@@ -68,6 +84,9 @@ def main():
         log.error("Contributions sync failed: %s", e)
         sys.exit(1)
 
+    # Only after every step succeeded — this is what tells open browser tabs that
+    # their data is stale and needs refetching.
+    mark_synced()
     log.info("Sync complete.")
 
 

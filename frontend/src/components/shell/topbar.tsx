@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/overlays";
 import { Skeleton } from "@/components/ui/primitives";
 import { relativeTime } from "@/lib/format";
-import { useProfile, useSync } from "@/lib/hooks";
+import { useProfile, useSync, useSyncWatcher } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 /** Toast — success and failure both land here. Never fake a success. */
@@ -41,6 +41,9 @@ function Toast({ tone, children }: { tone: "ok" | "err"; children: React.ReactNo
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { data: profile, isLoading } = useProfile();
   const sync = useSync();
+  // Mounted here because the Topbar is on every page of the app, so the watcher
+  // runs wherever the user happens to be sitting.
+  useSyncWatcher();
   const [toast, setToast] = useState<{ tone: "ok" | "err"; msg: string } | null>(null);
 
   useEffect(() => {
@@ -110,6 +113,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
                   height={32}
                   className="size-8 rounded-full ring-1 ring-hairline"
                   priority
+                  unoptimized
                 />
                 <span className="hidden text-left sm:block">
                   <span className="block text-[13px] leading-tight font-medium text-ink">

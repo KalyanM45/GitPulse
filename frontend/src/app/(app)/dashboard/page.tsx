@@ -14,9 +14,10 @@ import {
   UserRoundCheck,
   Users,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ContributionsByYear, LanguageDonut } from "@/components/dashboard/charts";
+
 import { ContributionHeatmap } from "@/components/dashboard/heatmap";
 import { KpiGrid, type Kpi } from "@/components/dashboard/kpi";
 import { TopRepos } from "@/components/dashboard/top-repos";
@@ -29,7 +30,7 @@ import {
   DropdownTrigger,
 } from "@/components/ui/overlays";
 import { Button } from "@/components/ui/button";
-import { PageHeading } from "@/components/ui/primitives";
+import { PageHeading, Skeleton } from "@/components/ui/primitives";
 import { comma } from "@/lib/format";
 import {
   useContributionYear,
@@ -38,6 +39,22 @@ import {
   useProfile,
   useReposOverview,
 } from "@/lib/hooks";
+
+/**
+ * Recharts is ~120kB of the dashboard's JavaScript and neither of these charts is
+ * visible on first paint — they sit below the KPI rows and the heatmap. Loading
+ * them on their own chunk lets the numbers at the top render while the chart code
+ * is still arriving. `ssr: false` because Recharts measures the DOM to size itself
+ * and has nothing useful to render on the server anyway.
+ */
+const ContributionsByYear = dynamic(
+  () => import("@/components/dashboard/charts").then((m) => m.ContributionsByYear),
+  { ssr: false, loading: () => <Skeleton className="mx-6 mb-6 h-64" /> },
+);
+const LanguageDonut = dynamic(
+  () => import("@/components/dashboard/charts").then((m) => m.LanguageDonut),
+  { ssr: false, loading: () => <Skeleton className="mx-6 mb-6 h-64" /> },
+);
 
 export default function DashboardPage() {
   const profile = useProfile();

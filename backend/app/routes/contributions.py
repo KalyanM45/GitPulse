@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from ..services import contributions_service
 
 router = APIRouter(prefix="/api", tags=["contributions"])
@@ -26,8 +26,8 @@ def get_contributions_year(year: int):
 
 
 @router.get("/contributions")
-def get_contributions_summary():
+def get_contributions_summary(with_latest: bool = Query(False)):
     try:
-        return contributions_service.get_contributions_summary()
+        return contributions_service.get_contributions_summary(with_latest=with_latest)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

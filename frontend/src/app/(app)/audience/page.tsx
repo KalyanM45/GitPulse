@@ -54,6 +54,10 @@ function UserCell({ row }: { row: AudienceRow }) {
         height={32}
         className="size-8 shrink-0 rounded-full ring-1 ring-hairline"
         loading="lazy"
+        // Served straight from GitHub's CDN, already the right size and format.
+        // Passing 24 of these through Next's image optimiser on first paint adds
+        // a cold optimisation per unique avatar and buys nothing.
+        unoptimized
       />
       <div className="min-w-0">
         {/* Display name leads when there is one; the handle is the identifier

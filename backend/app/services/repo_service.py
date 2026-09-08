@@ -368,64 +368,111 @@ def get_overview() -> dict:
         "top_languages": [], "most_starred": [], "most_viewed": [], "synced_at": None,
     }
 
-    stats_agg = list(col.aggregate([{"$group": {
-        "_id": None,
-        "total_repos": {"$sum": 1},
-        # $cond over the boolean rather than two extra count queries.
-        "private_repos": {"$sum": {"$cond": ["$is_private", 1, 0]}},
-        "total_stars": {"$sum": "$stars"},
-        "total_forks": {"$sum": "$forks"},
-        "total_watchers": {"$sum": "$watchers"},
-        "total_branches": {"$sum": "$branches"},
-        "total_commits_year": {"$sum": "$commits_last_year"},
-        "total_commits": {"$sum": "$commits_total"},
-    }}]))
-    if not stats_agg:
-        return empty
-
-    stats = {k: v for k, v in stats_agg[0].items() if k != "_id"}
-    stats["public_repos"] = stats["total_repos"] - stats["private_repos"]
-
-    # Traffic totals come from the accumulated day-wise store, not from each repo's
-    # 14-day rollup — so these keep climbing as history builds, and re-syncing the
-    # same window doesn't double-count.
-    traffic_agg = list(_traffic_col().aggregate([{"$group": {
-        "_id": None,
-        "total_views": {"$sum": "$views"},
-        "total_views_unique": {"$sum": "$views_uniques"},
-        "total_clones": {"$sum": "$clones"},
-        "total_clones_unique": {"$sum": "$clones_uniques"},
-    }}]))
-    if traffic_agg:
-        stats.update({k: v for k, v in traffic_agg[0].items() if k != "_id"})
-    else:
-        stats.update({
-            "total_views": 0, "total_views_unique": 0,
-            "total_clones": 0, "total_clones_unique": 0,
-        })
-
-    stats["traffic_days_recorded"] = len(_traffic_col().distinct("date"))
-
-    lang_agg = list(col.aggregate([
-        {"$project": {"languages": {"$objectToArray": "$languages"}}},
-        {"$unwind": "$languages"},
-        {"$group": {"_id": "$languages.k", "bytes": {"$sum": "$languages.v"}, "count": {"$sum": 1}}},
-        {"$sort": {"bytes": -1}},
-        {"$limit": 8},
-    ]))
-    top_languages = [{"name": d["_id"], "bytes": d["bytes"], "count": d["count"]} for d in lang_agg]
-
     proj = {
         "_id": 0, "name": 1, "stars": 1, "forks": 1, "language": 1,
         "html_url": 1, "description": 1, "is_private": 1, "watchers": 1,
         "commits_last_year": 1, "commits_total": 1, "branches": 1, "pushed_at": 1,
         "traffic_views_total": 1, "traffic_views_unique": 1, "views_all_time": 1,
     }
-    most_starred = list(col.find({}, proj).sort("stars", -1).limit(10))
-    most_viewed = list(col.find({}, proj).sort("views_all_time", -1).limit(10))
 
-    latest = col.find_one({}, {"synced_at": 1}, sort=[("synced_at", -1)])
-    synced_at = latest["synced_at"].isoformat() if latest and latest.get("synced_at") else None
+    # Everything this endpoint needs from repo_snapshots, in one pass. It used to be
+    # five separate queries — totals, languages, top-by-stars, top-by-views and the
+    # latest synced_at — each a full round trip to a remote database, all scanning
+    # the same documents. $facet forks one scan into the five results.
+    faceted = list(col.aggregate([
+        {"$facet": {
+            "stats": [
+                {"$group": {
+                    "_id": None,
+                    "total_repos": {"$sum": 1},
+                    # $cond over the boolean rather than two extra count queries.
+                    "private_repos": {"$sum": {"$cond": ["$is_private", 1, 0]}},
+                    "total_stars": {"$sum": "$stars"},
+                    "total_forks": {"$sum": "$forks"},
+                    "total_watchers": {"$sum": "$watchers"},
+                    "total_branches": {"$sum": "$branches"},
+                    "total_commits_year": {"$sum": "$commits_last_year"},
+                    "total_commits": {"$sum": "$commits_total"},
+                }},
+                {"$project": {"_id": 0}},
+            ],
+            "languages": [
+                {"$project": {"languages": {"$objectToArray": "$languages"}}},
+                {"$unwind": "$languages"},
+                {"$group": {
+                    "_id": "$languages.k",
+                    "bytes": {"$sum": "$languages.v"},
+                    "count": {"$sum": 1},
+                }},
+                {"$sort": {"bytes": -1}},
+                {"$limit": 8},
+            ],
+            "most_starred": [{"$sort": {"stars": -1}}, {"$limit": 10}, {"$project": proj}],
+            "most_viewed": [
+                {"$sort": {"views_all_time": -1}}, {"$limit": 10}, {"$project": proj},
+            ],
+            "latest": [
+                {"$sort": {"synced_at": -1}}, {"$limit": 1},
+                {"$project": {"_id": 0, "synced_at": 1}},
+            ],
+        }},
+    ]))
 
-    return {**stats, "top_languages": top_languages, "most_starred": most_starred,
-            "most_viewed": most_viewed, "synced_at": synced_at}
+    result = faceted[0] if faceted else {}
+    stats_agg = result.get("stats") or []
+    if not stats_agg:
+        return empty
+
+    stats = dict(stats_agg[0])
+    stats["public_repos"] = stats["total_repos"] - stats["private_repos"]
+
+    # Traffic totals come from the accumulated day-wise store, not from each repo's
+    # 14-day rollup — so these keep climbing as history builds, and re-syncing the
+    # same window doesn't double-count.
+    traffic = list(_traffic_col().aggregate([
+        {"$facet": {
+            "totals": [
+                {"$group": {
+                    "_id": None,
+                    "total_views": {"$sum": "$views"},
+                    "total_views_unique": {"$sum": "$views_uniques"},
+                    "total_clones": {"$sum": "$clones"},
+                    "total_clones_unique": {"$sum": "$clones_uniques"},
+                }},
+                {"$project": {"_id": 0}},
+            ],
+            # Counted server-side. `distinct("date")` shipped every recorded day
+            # back over the wire only to take its length — a list that grows
+            # forever by design, since this history is never pruned.
+            "days": [{"$group": {"_id": "$date"}}, {"$count": "n"}],
+        }},
+    ]))
+    traffic_result = traffic[0] if traffic else {}
+    totals = traffic_result.get("totals") or []
+    days = traffic_result.get("days") or []
+
+    if totals:
+        stats.update(totals[0])
+        stats["traffic_days_recorded"] = days[0]["n"] if days else 0
+    else:
+        stats.update({
+            "total_views": 0, "total_views_unique": 0,
+            "total_clones": 0, "total_clones_unique": 0,
+            "traffic_days_recorded": 0,
+        })
+
+    top_languages = [
+        {"name": d["_id"], "bytes": d["bytes"], "count": d["count"]}
+        for d in result.get("languages", [])
+    ]
+
+    latest = result.get("latest") or []
+    synced_at = latest[0]["synced_at"].isoformat() if latest and latest[0].get("synced_at") else None
+
+    return {
+        **stats,
+        "top_languages": top_languages,
+        "most_starred": result.get("most_starred", []),
+        "most_viewed": result.get("most_viewed", []),
+        "synced_at": synced_at,
+    }

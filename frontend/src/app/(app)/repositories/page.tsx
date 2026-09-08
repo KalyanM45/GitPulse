@@ -1,8 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { BookMarked, ExternalLink, SearchX, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
-import { RepoDrawer } from "@/components/repos/repo-drawer";
+
 import { Panel } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Column, DataTable, Pagination, SortHeader } from "@/components/ui/data-table";
@@ -13,6 +14,16 @@ import { comma, formatDate, languageColor, relativeTime } from "@/lib/format";
 import type { Repo } from "@/lib/types";
 import { useDebounced, useReposOverview, useRepos } from "@/lib/hooks";
 import { usePrefs } from "@/lib/prefs";
+
+/**
+ * The drawer renders nothing until a row is clicked, but it pulls in Recharts for
+ * the star-history chart — which was landing in the initial bundle of a page whose
+ * whole job is to show a table. Deferred until it is actually opened.
+ */
+const RepoDrawer = dynamic(
+  () => import("@/components/repos/repo-drawer").then((m) => m.RepoDrawer),
+  { ssr: false },
+);
 
 export default function RepositoriesPage() {
   const [page, setPage] = useState(1);
@@ -145,11 +156,35 @@ export default function RepositoriesPage() {
     },
     {
       id: "views",
-      header: "Views",
-      width: 100,
+      header: (
+        <SortHeader
+          label="Views"
+          field="views_all_time"
+          active={sort}
+          order={order}
+          onSort={onSort}
+          align="right"
+        />
+      ),
+      width: 110,
       align: "right",
+      /**
+       * `views_all_time`, not `traffic_views_total`. The latter is GitHub's rolling
+       * 14-day window, which is all GitHub itself will ever tell you — so the column
+       * silently reported "views in the last fortnight" under a heading that reads as
+       * a lifetime total, and the number went *down* as older days aged out.
+       *
+       * `views_all_time` is accumulated day-by-day in traffic_daily and is the whole
+       * history we hold. It is what the repo drawer has always shown, so the table
+       * and the drawer disagreed on the same repository.
+       */
       cell: (r) => (
-        <span className="tnum text-[12.5px] text-ink-2">{comma(r.traffic_views_total)}</span>
+        <span
+          className="tnum text-[12.5px] text-ink-2"
+          title={`${comma(r.views_all_time)} views over ${r.traffic_days_recorded} recorded days`}
+        >
+          {comma(r.views_all_time)}
+        </span>
       ),
     },
     {

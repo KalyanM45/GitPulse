@@ -21,39 +21,6 @@ def _events_col() -> Collection:
     return get_db()["follower_events"]
 
 
-def _drop_legacy_login_unique_index():
-    """The old schema keyed identity on login with a unique index. Identity now
-    lives on github_id, and login must be free to change — so demote it."""
-    for name, spec in _snapshots_col().index_information().items():
-        if spec.get("key") == [("login", 1)] and spec.get("unique"):
-            _snapshots_col().drop_index(name)
-
-
-def _ensure_indexes():
-    _drop_legacy_login_unique_index()
-    # github_id is the identity key — login is a mutable display attribute.
-    # sparse so pre-backfill documents (no github_id yet) don't collide.
-    _snapshots_col().create_index("github_id", unique=True, sparse=True)
-    _snapshots_col().create_index("login")
-    _snapshots_col().create_index([("captured_at", -1), ("login", 1)])
-    _events_col().create_index([("event_type", 1), ("event_at", -1), ("github_id", 1)])
-    _events_col().create_index([("github_id", 1), ("event_at", -1)])
-    _events_col().create_index([("login", 1), ("event_at", -1)])
-
-
-def _deduplicate_snapshots():
-    """Remove duplicate login entries, keeping the earliest captured_at."""
-    pipeline = [
-        {"$group": {"_id": "$login", "count": {"$sum": 1}, "ids": {"$push": "$_id"}, "first": {"$min": "$captured_at"}}},
-        {"$match": {"count": {"$gt": 1}}}
-    ]
-    for doc in _snapshots_col().aggregate(pipeline):
-        # keep the document with earliest captured_at, delete the rest
-        keep = _snapshots_col().find_one({"login": doc["_id"]}, sort=[("captured_at", 1)])
-        if keep:
-            _snapshots_col().delete_many({"login": doc["_id"], "_id": {"$ne": keep["_id"]}})
-
-
 def _id_from_avatar(avatar_url: str) -> int | None:
     m = _AVATAR_ID_RE.search(avatar_url or "")
     return int(m.group(1)) if m else None
@@ -87,8 +54,6 @@ def _backfill_snapshot_ids(docs: list[dict], by_login: dict) -> None:
 
 
 def sync_followers() -> dict:
-    _ensure_indexes()
-    _deduplicate_snapshots()
     now = datetime.now(timezone.utc)
 
     raw = fetch_all_followers()
@@ -227,7 +192,9 @@ def sync_followers() -> dict:
 def _search_filter(search: str) -> dict:
     if not search or not search.strip():
         return {}
-    return {"login": {"$regex": search.strip(), "$options": "i"}}
+    # Escaped: an unescaped search box is a regex injection — a stray "(" is a
+    # 500, and ".*" scans the collection.
+    return {"login": {"$regex": re.escape(search.strip()), "$options": "i"}}
 
 
 def get_current_followers(page: int = 1, per_page: int = 30, search: str = "") -> dict:
@@ -243,23 +210,18 @@ def get_current_followers(page: int = 1, per_page: int = 30, search: str = "") -
     return {"total": total, "page": page, "per_page": per_page, "data": docs}
 
 
-def _current_follower_keys() -> tuple[list, list]:
-    """Ids and logins of everyone currently following — used to exclude re-followers."""
-    docs = list(_snapshots_col().find({}, {"github_id": 1, "login": 1, "_id": 0}))
-    ids = [d["github_id"] for d in docs if d.get("github_id")]
-    logins = [d["login"] for d in docs if d.get("login")]
-    return ids, logins
+def _unfollowed_candidates(search: str = "") -> list[dict]:
+    """Latest unfollow event per person, newest first — before re-followers are removed.
 
-
-def _unfollowed_pipeline(search: str = "") -> list[dict]:
-    current_ids, current_logins = _current_follower_keys()
-
-    base_match: dict = {"event_type": "unfollowed"}
+    This is the expensive half of "who unfollowed me", so it is computed once and
+    handed to both the listing and the count.
+    """
+    match: dict = {"event_type": "unfollowed"}
     if search.strip():
-        base_match["login"] = {"$regex": search.strip(), "$options": "i"}
+        match["login"] = {"$regex": re.escape(search.strip()), "$options": "i"}
 
-    return [
-        {"$match": base_match},
+    return list(_events_col().aggregate([
+        {"$match": match},
         # sort before grouping so $first picks the most recent event
         {"$sort": {"event_at": -1, "login": 1}},
         # group on the identity key, falling back to login for un-backfilled events
@@ -273,13 +235,57 @@ def _unfollowed_pipeline(search: str = "") -> list[dict]:
             "event_at":   {"$first": "$event_at"},
             "event_type": {"$first": "$event_type"},
         }},
-        # exclude anyone currently following — matched by id first, login as fallback,
-        # so a rename can never leave a phantom entry stranded here
-        {"$match": {"$and": [
-            {"github_id": {"$nin": current_ids}},
-            {"login": {"$nin": current_logins}},
-        ]}},
         {"$sort": {"event_at": -1, "login": 1}},
+        {"$project": {"_id": 0}},
+    ]))
+
+
+def _still_following(candidates: list[dict]) -> tuple[set, set]:
+    """Which of `candidates` are in the current follower list — by id and by login.
+
+    The exclusion used to work the other way round: pull *every* follower snapshot
+    (1,400+ documents here) across the wire, build two big arrays out of them, and
+    ship those back into the aggregation as `$nin` operands. That moved the largest
+    payload in the app on every dashboard load and could not use an index — `$nin`
+    against an array that size is a linear scan per document.
+
+    Asking the opposite question is bounded by the number of people who have ever
+    unfollowed, which is far smaller, and `$in` on `github_id` and `login` is
+    served by the indexes that already exist.
+    """
+    ids = [c["github_id"] for c in candidates if c.get("github_id")]
+    logins = [c["login"] for c in candidates if c.get("login")]
+    if not ids and not logins:
+        return set(), set()
+
+    clauses = []
+    if ids:
+        clauses.append({"github_id": {"$in": ids}})
+    if logins:
+        clauses.append({"login": {"$in": logins}})
+
+    docs = _snapshots_col().find({"$or": clauses}, {"github_id": 1, "login": 1, "_id": 0})
+    found_ids, found_logins = set(), set()
+    for d in docs:
+        if d.get("github_id"):
+            found_ids.add(d["github_id"])
+        if d.get("login"):
+            found_logins.add(d["login"])
+    return found_ids, found_logins
+
+
+def _unfollowed_rows(search: str = "") -> list[dict]:
+    """Everyone who unfollowed and has NOT re-followed, newest unfollow first."""
+    candidates = _unfollowed_candidates(search)
+    if not candidates:
+        return []
+
+    # Matched by id first, login as fallback, so a rename can never leave a phantom
+    # entry stranded here.
+    following_ids, following_logins = _still_following(candidates)
+    return [
+        c for c in candidates
+        if c.get("github_id") not in following_ids and c.get("login") not in following_logins
     ]
 
 
@@ -288,23 +294,18 @@ def get_current_unfollowed(page: int = 1, per_page: int = 30, search: str = "") 
     Users who unfollowed and have NOT re-followed.
     Deduplicates by github_id — shows only the most recent unfollow event per user.
     """
-    pipeline_base = _unfollowed_pipeline(search)
+    rows = _unfollowed_rows(search)
 
-    count_result = list(_events_col().aggregate(pipeline_base + [{"$count": "total"}]))
-    total = count_result[0]["total"] if count_result else 0
-
-    docs = list(_events_col().aggregate(
-        pipeline_base + [
-            {"$skip": (page - 1) * per_page},
-            {"$limit": per_page},
-            {"$project": {"_id": 0}},
-        ]
-    ))
+    # Sliced here rather than with $skip/$limit because the re-follower exclusion
+    # decides what is on a page, and that is resolved above. It also means the count
+    # and the page come from one pass instead of the two full runs this used to do.
+    start = (page - 1) * per_page
+    docs = [dict(d) for d in rows[start:start + per_page]]
     for d in docs:
         if isinstance(d.get("event_at"), datetime):
             d["event_at"] = d["event_at"].isoformat()
 
-    return {"total": total, "page": page, "per_page": per_page, "data": docs}
+    return {"total": len(rows), "page": page, "per_page": per_page, "data": docs}
 
 
 def get_follower_history(login: str) -> list[dict]:
@@ -332,11 +333,8 @@ def get_follower_history(login: str) -> list[dict]:
 def get_stats() -> dict:
     db = get_db()
 
-    # count unique users who unfollowed and have NOT re-followed
-    unique_unfollowed = db["follower_events"].aggregate(
-        _unfollowed_pipeline() + [{"$count": "total"}]
-    )
-    unfollowed_count = next(unique_unfollowed, {}).get("total", 0)
+    # unique users who unfollowed and have NOT re-followed
+    unfollowed_count = len(_unfollowed_rows())
 
     return {
         "total_followers": db["follower_snapshots"].count_documents({}),

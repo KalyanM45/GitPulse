@@ -10,6 +10,7 @@ import type {
   ReposOverview,
   StarPoint,
   SyncResult,
+  SyncStatus,
   TrafficDay,
 } from "./types";
 
@@ -132,10 +133,16 @@ export const api = {
   starHistory: (name: string, signal?: AbortSignal) =>
     get<StarPoint[]>(`/repos/${encodeURIComponent(name)}/star-history`, signal),
 
-  contributions: (signal?: AbortSignal) => get<ContributionsSummary>("/contributions", signal),
+  contributions: (withLatest = false, signal?: AbortSignal) =>
+    get<ContributionsSummary>(
+      `/contributions${withLatest ? "?with_latest=true" : ""}`,
+      signal,
+    ),
 
   contributionYear: (year: number, signal?: AbortSignal) =>
     get<ContributionYear>(`/contributions/${year}`, signal),
+
+  syncStatus: (signal?: AbortSignal) => get<SyncStatus>("/sync-status", signal),
 
   sync: async (): Promise<SyncResult> => {
     const res = await fetch(`${API}/sync`, { method: "POST" });

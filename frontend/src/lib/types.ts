@@ -188,6 +188,17 @@ export interface ContributionsSummary {
   years: ContributionYearSummary[];
   total_all_time: number;
   synced_at: string | null;
+  /**
+   * The full document for the most recent year, when the summary was requested
+   * with `with_latest`. Present so the dashboard's heatmap does not need a second,
+   * strictly sequential request — see useContributions.
+   */
+  latest?: ContributionYear | null;
+}
+
+export interface SyncStatus {
+  /** ISO timestamp of the last completed sync, from any source. null before the first. */
+  last_sync_at: string | null;
 }
 
 export interface SyncResult {

@@ -46,7 +46,14 @@ def sync_contributions() -> dict:
     }
 
 
-def get_contributions_summary() -> dict:
+def get_contributions_summary(with_latest: bool = False) -> dict:
+    """Per-year totals, newest first.
+
+    `with_latest` additionally embeds the full document for the most recent year.
+    The dashboard cannot know which year to ask for until this response tells it,
+    so fetching the heatmap was strictly sequential: summary, then year. Returning
+    the year the dashboard is certain to open with collapses that into one request.
+    """
     docs = list(
         get_db()["contributions"]
         .find(
@@ -64,11 +71,15 @@ def get_contributions_summary() -> dict:
         if hasattr(d.get("synced_at"), "isoformat"):
             d["synced_at"] = d["synced_at"].isoformat()
 
-    return {
+    summary = {
         "years":          docs,
         "total_all_time": total_all_time,
         "synced_at":      docs[0]["synced_at"] if docs else None,
     }
+    if with_latest:
+        # docs is sorted newest-first, so docs[0] is the year the dashboard opens on.
+        summary["latest"] = get_contributions_year(docs[0]["year"])
+    return summary
 
 
 def get_contributions_year(year: int) -> dict | None:

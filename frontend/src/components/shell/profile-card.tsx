@@ -185,6 +185,7 @@ export function SidebarProfile() {
           width={40}
           height={40}
           className="size-10 shrink-0 rounded-full ring-1 ring-hairline"
+          unoptimized
         />
         <div className="min-w-0">
           <p className="truncate text-[13px] font-semibold text-ink">{p.name}</p>
