@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { AuthLoading, AuthShell } from "@/components/auth/auth-ui";
-import { Button } from "@/components/ui/button";
+import { NoAccess } from "@/components/access/no-access";
+import { AuthLoading } from "@/components/auth/auth-ui";
 import { MobileSidebar, Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 
@@ -13,7 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [menu, setMenu] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { status, user, appUser, signOut } = useAuth();
+  const { status, appUser } = useAuth();
 
   // Not ready for the dashboard yet: no GitHub connected, or nothing synced so far.
   // (appUser is null only if the API was unreachable: let the dashboard handle that.)
@@ -27,23 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     else if (status === "authenticated" && needsOnboarding) router.replace("/connect");
   }, [status, needsOnboarding, pathname, router]);
 
-  if (status === "forbidden") {
-    return (
-      <AuthShell
-        title="No access yet"
-        subtitle={
-          <>
-            You&apos;re signed in as <span className="font-medium text-ink-2">{user?.email}</span>, but this
-            account hasn&apos;t been given access to GitPulse.
-          </>
-        }
-      >
-        <Button variant="secondary" className="w-full" onClick={() => signOut()}>
-          Sign out
-        </Button>
-      </AuthShell>
-    );
-  }
+  if (status === "forbidden") return <NoAccess />;
   if (status !== "authenticated" || needsOnboarding) return <AuthLoading />;
 
   return (

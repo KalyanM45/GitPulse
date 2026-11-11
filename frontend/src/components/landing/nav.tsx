@@ -2,6 +2,7 @@
 
 import { Activity, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { RequestAccessDialog } from "@/components/access/request-access";
 import { Magnetic } from "@/components/motion/primitives";
 import { Button } from "@/components/ui/button";
 
@@ -16,14 +17,19 @@ export function LandingNav() {
           <span className="text-[15px] font-semibold tracking-tight text-ink">GitPulse</span>
         </Link>
 
-        <Magnetic strength={0.25}>
-          <Button asChild variant="primary" size="sm">
-            <Link href="/dashboard">
-              Open dashboard
-              <ArrowRight className="size-3.5" />
-            </Link>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/login">Sign in</Link>
           </Button>
-        </Magnetic>
+          <Magnetic strength={0.25}>
+            <RequestAccessDialog>
+              <Button variant="primary" size="sm">
+                Request access
+                <ArrowRight className="size-3.5" />
+              </Button>
+            </RequestAccessDialog>
+          </Magnetic>
+        </div>
       </nav>
     </header>
   );

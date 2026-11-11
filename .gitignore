@@ -28,3 +28,11 @@ shots/
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# Terraform: state can hold infrastructure details; providers are re-downloaded.
+# (.terraform.lock.hcl IS committed, to pin provider versions.)
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfvars
+infra/*.tfplan

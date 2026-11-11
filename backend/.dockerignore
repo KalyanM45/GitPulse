@@ -12,3 +12,7 @@ __pycache__/
 Dockerfile
 .dockerignore
 *.md
+
+# Tests and dev requirements are not needed in the runtime image
+tests/
+requirements-dev.txt

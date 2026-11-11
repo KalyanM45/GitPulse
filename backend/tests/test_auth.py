@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import database  # noqa: E402
-from app.auth import deps, firebase  # noqa: E402
+from app.auth import firebase  # noqa: E402
 from app.main import app  # noqa: E402
 
 PROJECT = "test-project"
@@ -110,12 +110,13 @@ def test_unverified_email_rejected(client):
     assert r.status_code == 403 and r.json()["detail"]["code"] == "email_not_verified"
 
 
-def test_allowlist(client, monkeypatch):
-    monkeypatch.setattr(deps, "ALLOWED_EMAILS", {"owner@example.com"})
+def test_invite_only_blocks_uninvited(client, monkeypatch):
+    from app import access
+    monkeypatch.setattr(access, "ACCESS_MODE", "invite")
     r = get(client, "/api/auth/me", make_token())
     assert r.status_code == 403 and r.json()["detail"]["code"] == "not_invited"
-    r = get(client, "/api/auth/me", make_token(email="Owner@Example.com"))
-    assert r.status_code == 200
+    monkeypatch.setattr(access, "ALLOWED_EMAILS", {"dev@example.com"})
+    assert get(client, "/api/auth/me", make_token()).status_code == 200
 
 
 def test_google_keys_unreachable_is_503_not_401(client, monkeypatch):

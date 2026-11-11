@@ -12,7 +12,8 @@ jobs:
   sync:
     name: Sync all connected users
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Syncs every connected user in turn; a large account alone takes ~10 minutes.
+    timeout-minutes: 120
 
     steps:
       - name: Checkout

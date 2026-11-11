@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars (gitignored) and adjust. Every value has a default in
+# variables.tf, so this file is only for what you want to change.
+
+# Billing → Overview → "Billing account ID". Leave empty to skip the budget alert.
+billing_account_id = ""
+
+# Email alerts at 50% / 90% / 100% of this amount per month.
+budget_amount   = 500
+budget_currency = "INR"
+
+# Add your custom domain here once you have one.
+frontend_origins = ["https://gitpulse.vercel.app", "http://localhost:3000"]

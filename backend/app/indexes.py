@@ -87,4 +87,9 @@ def ensure_indexes() -> None:
     )
     db["sync_jobs"].create_index("status")
 
+    # ── Invite-only program ──
+    db["access_requests"].create_index("email", unique=True)
+    db["access_requests"].create_index([("status", 1), ("created_at", -1)])
+    db["rate_limits"].create_index("expires_at", expireAfterSeconds=0)
+
     log.info("Indexes ensured.")

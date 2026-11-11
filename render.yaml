@@ -22,7 +22,11 @@ services:
       # Auth (Firebase). The project ID is public; ALLOWED_EMAILS limits who gets in.
       - key: FIREBASE_PROJECT_ID
         value: gitpulse2026
-      - key: ALLOWED_EMAILS
+      # Invite-only program. ADMIN_EMAILS (your sign-in email) is entered in the
+      # Render dashboard so it isn't published in this public repo.
+      - key: ACCESS_MODE
+        value: invite
+      - key: ADMIN_EMAILS
         sync: false
       # Encrypts users' GitHub tokens in MongoDB. Generated once; never change it
       # (or copy it into the GitHub Actions secret TOKEN_ENCRYPTION_KEY too).

@@ -7,9 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from .auth.deps import require_tenant
-from .config import ALLOWED_EMAILS, CORS_ORIGINS, FIREBASE_PROJECT_ID
+from .config import ACCESS_MODE, ADMIN_EMAILS, CORS_ORIGINS, ENABLE_SCHEDULER, FIREBASE_PROJECT_ID
 from .database import close_db, connect
 from .indexes import ensure_indexes
+from .routes.access import router as access_router
 from .routes.auth import router as auth_router
 from .routes.contributions import router as contributions_router
 from .routes.followers import router as followers_router
@@ -33,7 +34,8 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_ensure_indexes_quietly, name="ensure-indexes", daemon=True).start()
 
     _warn_about_auth_config()
-    start_scheduler()
+    if ENABLE_SCHEDULER:
+        start_scheduler()
     yield
     stop_scheduler()
     close_db()
@@ -42,8 +44,8 @@ async def lifespan(app: FastAPI):
 def _warn_about_auth_config() -> None:
     if not FIREBASE_PROJECT_ID:
         log.error("FIREBASE_PROJECT_ID is not set: every API request will be rejected as unauthenticated.")
-    if not ALLOWED_EMAILS:
-        log.info("ALLOWED_EMAILS is not set: open sign-up (each user only sees their own data).")
+    if ACCESS_MODE == "invite" and not ADMIN_EMAILS:
+        log.warning("Invite-only mode with no ADMIN_EMAILS: nobody can approve access requests.")
 
 
 def _ensure_indexes_quietly() -> None:
@@ -81,6 +83,7 @@ app.add_middleware(
 # /api is GitHub data: it needs a signed-in user with GitHub connected, and is
 # scoped to that user's data (see tenant.py).
 app.include_router(auth_router)
+app.include_router(access_router)
 _protected = [Depends(require_tenant)]
 app.include_router(followers_router, dependencies=_protected)
 app.include_router(repos_router, dependencies=_protected)

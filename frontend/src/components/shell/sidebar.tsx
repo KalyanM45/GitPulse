@@ -1,10 +1,11 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, BookMarked, LayoutDashboard, Users, X } from "lucide-react";
+import { Activity, BookMarked, LayoutDashboard, ShieldCheck, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { SidebarProfile } from "./profile-card";
 import { cn } from "@/lib/utils";
 
@@ -14,12 +15,16 @@ const NAV = [
   { href: "/repositories", label: "Repositories", icon: BookMarked },
 ];
 
+const ADMIN_NAV = { href: "/admin", label: "Access", icon: ShieldCheck };
+
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { appUser } = useAuth();
+  const items = appUser?.is_admin ? [...NAV, ADMIN_NAV] : NAV;
 
   return (
     <nav className="flex flex-col gap-0.5 px-3" aria-label="Primary">
-      {NAV.map(({ href, label, icon: Icon }) => {
+      {items.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
           <Link

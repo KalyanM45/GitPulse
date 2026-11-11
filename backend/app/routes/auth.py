@@ -7,7 +7,7 @@ import requests
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from .. import database
+from .. import access, database
 from ..auth import users
 from ..auth.crypto import EncryptionUnavailable
 from ..auth.deps import require_user
@@ -39,6 +39,7 @@ def _me(user: dict) -> dict:
         "sync": sync_runner.job_status(user["_id"]),
         # Set once any sync has completed: the dashboard has something to show.
         "last_synced_at": _last_synced_at(user),
+        "is_admin": access.is_admin(user.get("email", "")),
     }
 
 

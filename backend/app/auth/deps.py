@@ -1,9 +1,9 @@
-"""FastAPI dependency that guards every non-public API route."""
+"""FastAPI dependencies that guard the API."""
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from ..config import ALLOWED_EMAILS
+from .. import access
 from . import users
 from .firebase import AuthUnavailable, verify_id_token
 
@@ -15,7 +15,9 @@ def _deny(status: int, code: str, message: str, www_auth: str | None = None):
     raise HTTPException(status_code=status, detail={"code": code, "message": message}, headers=headers)
 
 
-def require_user(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict:
+def require_identity(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict:
+    """A valid Firebase token with a verified email. Says nothing about access:
+    used where people without an invite are allowed (checking their request)."""
     if creds is None:
         _deny(401, "not_authenticated", "Sign in to continue.", "Bearer")
     try:
@@ -24,14 +26,22 @@ def require_user(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) 
         _deny(503, "auth_unavailable", "Sign-in is temporarily unavailable. Please try again.")
     if claims is None:
         _deny(401, "token_invalid", "Your session has expired.", 'Bearer error="invalid_token"')
-
     if not claims.get("email_verified"):
         _deny(403, "email_not_verified", "Verify your email address to continue.")
-    email = (claims.get("email") or "").lower()
-    if ALLOWED_EMAILS and email not in ALLOWED_EMAILS:
-        _deny(403, "not_invited", "This account doesn't have access to GitPulse yet.")
+    return claims
 
+
+def require_user(claims: dict = Depends(require_identity)) -> dict:
+    """A signed-in, verified user who has been let in (invite-only program)."""
+    if not access.has_access(claims.get("email") or ""):
+        _deny(403, "not_invited", "GitPulse is invite-only, and this account hasn't been invited yet.")
     return users.get_or_create(claims)
+
+
+def require_admin(user: dict = Depends(require_user)) -> dict:
+    if not access.is_admin(user.get("email", "")):
+        _deny(403, "not_admin", "Only admins can do this.")
+    return user
 
 
 async def require_tenant(user: dict = Depends(require_user)):

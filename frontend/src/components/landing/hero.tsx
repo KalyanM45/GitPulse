@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { RequestAccessDialog } from "@/components/access/request-access";
 import { Magnetic } from "@/components/motion/primitives";
 import { Button } from "@/components/ui/button";
 import { DashboardMockup } from "./mockup";
@@ -123,10 +124,10 @@ export function Hero() {
             <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-glass py-1.5 pr-3.5 pl-1.5 backdrop-blur-xl">
               <span className="flex items-center gap-1 rounded-full bg-indigo-2/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-indigo-lift uppercase">
                 <ShieldCheck className="size-3" />
-                v2
+                Invite-only
               </span>
               <span className="text-[13px] text-ink-2">
-                Your GitHub history, kept on purpose
+                Private beta. Request access to join
               </span>
             </span>
           </motion.div>
@@ -156,23 +157,26 @@ export function Hero() {
             className="mt-7 flex flex-wrap items-center gap-3 lg:mt-8"
           >
             <Magnetic>
-              <Button asChild variant="primary" size="lg">
-                <Link href="/dashboard">
-                  Open dashboard
+              <RequestAccessDialog>
+                <Button variant="primary" size="lg">
+                  Request access
                   <ArrowRight className="size-4" />
-                </Link>
-              </Button>
+                </Button>
+              </RequestAccessDialog>
             </Magnetic>
+            {/* Invited users: sign in (if needed) and land on their own dashboard. */}
             <Button asChild variant="secondary" size="lg">
-              <a
-                href="https://github.com/KalyanM45"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Github className="size-4" />
-                View source
-              </a>
+              <Link href="/dashboard">Open my dashboard</Link>
             </Button>
+            <a
+              href="https://github.com/KalyanM45"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitPulse on GitHub"
+              className="flex size-12 items-center justify-center rounded-control text-ink-3 transition hover:bg-glass hover:text-ink"
+            >
+              <Github className="size-5" />
+            </a>
           </motion.div>
 
           <Pillars />

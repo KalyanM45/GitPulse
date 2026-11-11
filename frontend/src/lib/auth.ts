@@ -140,6 +140,7 @@ export interface AppUser {
   github: GitHubConnection;
   sync: SyncJob | null;
   last_synced_at: string | null;
+  is_admin: boolean;
 }
 
 async function apiCall<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -152,6 +153,71 @@ async function apiCall<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) throw await errorFromResponse(res);
   return res.json() as Promise<T>;
 }
+
+// ── Invite-only program ─────────────────────────────────────────────────────
+
+export interface AccessRequestInput {
+  email: string;
+  name?: string;
+  github?: string;
+  note?: string;
+}
+
+export interface AccessRequest extends Required<AccessRequestInput> {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string | null;
+  decided_at: string | null;
+}
+
+export interface Member {
+  email: string;
+  role: "admin" | "config" | "invited";
+  invited_at: string | null;
+  signed_up: boolean;
+  github_login: string | null;
+  avatar_url: string | null;
+  last_seen_at: string | null;
+}
+
+export const accessApi = {
+  /** Public: no sign-in needed. */
+  request: async (input: AccessRequestInput): Promise<{ message: string }> => {
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/access/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+    } catch {
+      throw new AuthApiError("Can't reach the server. Check your connection and try again.", 0);
+    }
+    if (!res.ok) throw await errorFromResponse(res);
+    return res.json();
+  },
+  /** For a signed-in user without access: have they asked already? */
+  status: () =>
+    apiCall<{ email: string; has_access: boolean; request: AccessRequest["status"] | null }>(
+      "/api/access/status",
+    ),
+};
+
+export const adminApi = {
+  requests: (status?: AccessRequest["status"]) =>
+    apiCall<AccessRequest[]>(`/api/admin/requests${status ? `?status=${status}` : ""}`),
+  approve: (id: string) => apiCall<AccessRequest>(`/api/admin/requests/${id}/approve`, { method: "POST" }),
+  reject: (id: string) => apiCall<AccessRequest>(`/api/admin/requests/${id}/reject`, { method: "POST" }),
+  members: () => apiCall<Member[]>("/api/admin/members"),
+  invite: (email: string) =>
+    apiCall<{ email: string }>("/api/admin/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    }),
+  revoke: (email: string) =>
+    apiCall<{ status: string }>(`/api/admin/invites/${encodeURIComponent(email)}`, { method: "DELETE" }),
+};
 
 export const githubApi = {
   /** Hand the token from the GitHub popup to the API; starts the first sync. */
