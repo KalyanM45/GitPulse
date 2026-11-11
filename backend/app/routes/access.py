@@ -1,9 +1,9 @@
 """Invite-only program: public access requests, and the admin's controls."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from .. import access
+from .. import access, notify
 from ..access import AccessError
 from ..auth.deps import require_admin, require_identity
 
@@ -29,12 +29,18 @@ class RequestBody(BaseModel):
 
 
 @router.post("/api/access/request")
-def request_access(body: RequestBody, request: Request):
-    """Public: anyone can ask for an invite."""
+def request_access(body: RequestBody, request: Request, background: BackgroundTasks):
+    """Public: anyone can ask for an invite. The owner is emailed (in the
+    background, after responding) and the request appears on /admin."""
     try:
-        return access.submit_request(body.email, body.name, body.github, body.note, _client_ip(request))
+        response, should_notify = access.submit_request(
+            body.email, body.name, body.github, body.note, _client_ip(request)
+        )
     except AccessError as e:
         _raise(e)
+    if should_notify:
+        background.add_task(notify.access_request_received, body.email.strip().lower(), body.note.strip())
+    return response
 
 
 @router.get("/api/access/status")

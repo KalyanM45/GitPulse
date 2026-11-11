@@ -27,6 +27,20 @@ class Tenant:
     github_id: int
     github_login: str
     github_token: str
+    # Set only for the public demo: the repositories it may show. None = no
+    # restriction. When set, private repos are invisible to every query below.
+    public_repos: frozenset[str] | None = None
+
+
+# Extra filters applied while `public_repos` is set, per collection.
+def _visibility_filter(name: str, tenant: Tenant) -> dict:
+    if tenant.public_repos is None:
+        return {}
+    if name == "repo_snapshots":
+        return {"is_private": False}
+    if name in ("traffic_daily", "star_snapshots"):
+        return {"repo": {"$in": sorted(tenant.public_repos)}}
+    return {}
 
 
 _current: ContextVar[Tenant | None] = ContextVar("gitpulse_tenant", default=None)
@@ -67,6 +81,7 @@ class ScopedCollection:
 
     def __init__(self, col: Collection):
         self._col = col
+        self._name = col.name
 
     @property
     def _owner(self) -> ObjectId:
@@ -77,7 +92,13 @@ class ScopedCollection:
         if "owner_id" in flt and flt["owner_id"] != self._owner:
             raise PermissionError("Query tried to reach another user's data.")
         flt["owner_id"] = self._owner
-        return flt
+        extra = _visibility_filter(self._name, current())
+        if not extra:
+            return flt
+        if extra.keys() & flt.keys():
+            # Same field in both (e.g. {"repo": name}): both must hold.
+            return {"$and": [flt, extra]}
+        return {**flt, **extra}
 
     def _d(self, doc: dict) -> dict:
         return {**doc, "owner_id": self._owner}
@@ -93,7 +114,7 @@ class ScopedCollection:
         return self._col.count_documents(self._f(flt), **kwargs)
 
     def aggregate(self, pipeline: list, **kwargs):
-        return self._col.aggregate([{"$match": {"owner_id": self._owner}}, *pipeline], **kwargs)
+        return self._col.aggregate([{"$match": self._f({})}, *pipeline], **kwargs)
 
     # writes (filter equality on owner_id means upserts insert it too)
     def update_one(self, flt, update, **kwargs):

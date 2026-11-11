@@ -24,6 +24,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Where to go after signing in (e.g. the demo); passed on to the sign-up link too.
+  const next = params.get("next");
+  const nextQs = next ? `?next=${encodeURIComponent(next)}` : "";
+  const fromDemo = !!next?.startsWith("/demo");
+
   if (status !== "anonymous") return <AuthLoading />;
 
   const submit = async (e: FormEvent) => {
@@ -42,11 +47,15 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to your GitPulse dashboard."
+      title={fromDemo ? "Sign in to view the demo" : "Welcome back"}
+      subtitle={
+        fromDemo
+          ? "The live demo is open to anyone with a GitPulse account. New here? Create one in a minute."
+          : "Sign in to your GitPulse dashboard."
+      }
       footer={
         <>
-          New to GitPulse? <TextLink href="/signup">Create an account</TextLink>
+          New to GitPulse? <TextLink href={`/signup${nextQs}`}>Create an account</TextLink>
         </>
       }
     >

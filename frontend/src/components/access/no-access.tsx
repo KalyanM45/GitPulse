@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock } from "lucide-react";
+import { Clock, Eye } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AuthLoading, AuthShell, FormAlert } from "@/components/auth/auth-ui";
@@ -51,6 +52,7 @@ export function NoAccess() {
           <Button variant="secondary" className="w-full" onClick={() => refresh()}>
             Check again
           </Button>
+          <ViewDemoButton />
         </div>
       </AuthShell>
     );
@@ -71,6 +73,20 @@ export function NoAccess() {
         lockedEmail
         defaults={{ email: user?.email ?? "", name: user?.displayName ?? "" }}
       />
+      <div className="mt-3">
+        <ViewDemoButton />
+      </div>
     </AuthShell>
+  );
+}
+
+/** Uninvited users can still look around a real dashboard. */
+function ViewDemoButton() {
+  return (
+    <Button asChild variant="ghost" className="w-full gap-2">
+      <Link href="/demo/dashboard">
+        <Eye className="size-4" /> Meanwhile, view the live demo
+      </Link>
+    </Button>
   );
 }

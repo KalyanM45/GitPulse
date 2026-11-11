@@ -51,3 +51,26 @@ TOKEN_ENCRYPTION_KEY = os.getenv("TOKEN_ENCRYPTION_KEY", "")
 # GitHub requires for repository traffic (views/clones) and private repositories.
 GITHUB_SCOPES = ["repo", "read:user"]
 
+# ── Public demo ──
+# The GitHub account whose dashboard anyone can browse, read-only, at /demo
+# (normally the owner's). Empty = no demo.
+DEMO_GITHUB_LOGIN = os.getenv("DEMO_GITHUB_LOGIN", "").strip()
+# Hide private repositories (names, traffic, stars) from the demo. On by default.
+DEMO_HIDE_PRIVATE_REPOS = os.getenv("DEMO_HIDE_PRIVATE_REPOS", "true").lower() in ("1", "true", "yes")
+
+# ── Email notifications (new access requests) ──
+# Any SMTP provider. Gmail: host smtp.gmail.com, port 587, your address as user,
+# and an App Password (Google Account → Security → 2-Step Verification → App
+# passwords). Unset = requests are still saved and shown on /admin, just not emailed.
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "") or SMTP_USER
+# Who gets the emails. Defaults to the admins.
+NOTIFY_EMAILS = [
+    e.strip() for e in os.getenv("NOTIFY_EMAILS", ",".join(sorted(ADMIN_EMAILS))).split(",") if e.strip()
+]
+# Public URL of the frontend, for links in emails.
+APP_URL = os.getenv("APP_URL", "http://localhost:3000").rstrip("/")
+

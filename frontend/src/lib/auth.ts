@@ -203,6 +203,23 @@ export const accessApi = {
     ),
 };
 
+export interface DemoInfo {
+  available: boolean;
+  login?: string;
+  name?: string;
+  avatar_url?: string;
+  private_repos_hidden?: number;
+}
+
+export const demoApi = {
+  /** Public profile of the demo account, for the demo banner. */
+  info: async (): Promise<DemoInfo> => {
+    const res = await fetch(`${API_BASE}/api/demo`);
+    if (!res.ok) throw await errorFromResponse(res);
+    return res.json();
+  },
+};
+
 export const adminApi = {
   requests: (status?: AccessRequest["status"]) =>
     apiCall<AccessRequest[]>(`/api/admin/requests${status ? `?status=${status}` : ""}`),

@@ -9,6 +9,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from .auth.deps import require_tenant
 from .config import ACCESS_MODE, ADMIN_EMAILS, CORS_ORIGINS, ENABLE_SCHEDULER, FIREBASE_PROJECT_ID
 from .database import close_db, connect
+from .demo import demo_info, require_demo_tenant
 from .indexes import ensure_indexes
 from .routes.access import router as access_router
 from .routes.auth import router as auth_router
@@ -88,6 +89,18 @@ _protected = [Depends(require_tenant)]
 app.include_router(followers_router, dependencies=_protected)
 app.include_router(repos_router, dependencies=_protected)
 app.include_router(contributions_router, dependencies=_protected)
+
+# Public read-only demo: the same read endpoints again under /demo/api/*, scoped
+# to the demo account and limited to GET (see demo.py).
+_demo = [Depends(require_demo_tenant)]
+for _router in (followers_router, repos_router, contributions_router):
+    app.include_router(_router, prefix="/demo", dependencies=_demo)
+
+
+@app.get("/api/demo")
+def demo():
+    """Whose dashboard the demo shows (public profile only), for the demo banner."""
+    return demo_info()
 
 
 @app.get("/health")

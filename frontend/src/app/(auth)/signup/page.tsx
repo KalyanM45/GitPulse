@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
   AuthLoading,
@@ -18,6 +19,8 @@ import { authApi, authMessage } from "@/lib/auth";
 
 export default function SignupPage() {
   const status = useAuthRedirect("anonymous");
+  const next = useSearchParams().get("next");
+  const nextQs = next ? `?next=${encodeURIComponent(next)}` : "";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -50,10 +53,10 @@ export default function SignupPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="GitPulse is invite-only: sign up with the email you were invited with. We'll email you a link to confirm it."
+      subtitle="Anyone can create an account to view the live demo. Invited emails also get their own dashboard. We'll email you a link to confirm your address."
       footer={
         <>
-          Already have an account? <TextLink href="/login">Sign in</TextLink>
+          Already have an account? <TextLink href={`/login${nextQs}`}>Sign in</TextLink>
         </>
       }
     >

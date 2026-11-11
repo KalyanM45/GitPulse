@@ -5,6 +5,7 @@ import { Check, LogOut, Menu, RefreshCw, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useBasePath } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/overlays";
 import { Skeleton } from "@/components/ui/primitives";
@@ -43,6 +44,8 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { data: profile, isLoading } = useProfile();
   const sync = useSync();
   const { user, signOut } = useAuth();
+  // The demo is read-only: no Sync button there.
+  const isDemo = useBasePath() === "/demo";
   // Mounted here because the Topbar is on every page of the app, so the watcher
   // runs wherever the user happens to be sitting.
   useSyncWatcher();
@@ -81,6 +84,8 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           </button>
 
           <div className="ml-auto flex items-center gap-3">
+            {!isDemo && (
+              <>
             <Tooltip content="Pull the latest data from GitHub">
               <Button
                 variant="secondary"
@@ -94,6 +99,8 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
               </Button>
             </Tooltip>
 
+              </>
+            )}
             <div className="h-6 w-px bg-hairline" aria-hidden />
 
             {isLoading ? (

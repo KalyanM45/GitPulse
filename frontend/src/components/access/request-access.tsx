@@ -37,8 +37,8 @@ export function RequestAccessForm({
         <CheckCircle2 className="size-9 text-positive" />
         <p className="text-[15px] font-medium text-ink">Request received</p>
         <p className="max-w-sm text-[13px] leading-relaxed text-ink-3">
-          Thanks! Once you&apos;re approved, sign in with{" "}
-          <span className="font-medium text-ink-2">{form.email.trim()}</span> to see your dashboard.
+          Thanks! Your request has been sent. Once you&apos;re approved, sign in with{" "}
+          <span className="font-medium text-ink-2">{form.email.trim()}</span> to see your own dashboard.
         </p>
         {onDone && (
           <Button variant="secondary" size="sm" className="mt-2" onClick={onDone}>
@@ -79,26 +79,27 @@ export function RequestAccessForm({
           className={lockedEmail ? "opacity-70" : undefined}
         />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Name" htmlFor="ra-name">
-          <Input id="ra-name" autoComplete="name" maxLength={80} value={form.name} onChange={set("name")} />
-        </Field>
-        <Field label="GitHub username" htmlFor="ra-github">
-          <Input id="ra-github" maxLength={40} value={form.github} onChange={set("github")} placeholder="octocat" />
-        </Field>
-      </div>
-      <Field label="Why do you want in? (optional)" htmlFor="ra-note">
+      <Field label="Why are you interested?" htmlFor="ra-note">
         <textarea
           id="ra-note"
+          required
+          minLength={10}
           maxLength={500}
-          rows={3}
+          rows={4}
           value={form.note}
           onChange={set("note")}
           className="w-full resize-none rounded-control border border-hairline bg-black/20 px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-3 transition hover:border-hairline-strong focus:border-indigo-2/60 focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)] focus:outline-none"
-          placeholder="e.g. I maintain a few open-source repos and want long-term traffic stats."
+          placeholder="A line or two, e.g. I maintain a few open-source repos and want long-term traffic history."
         />
+        <p className="text-right text-[11.5px] text-ink-3">{(form.note ?? "").length}/500</p>
       </Field>
-      <Button type="submit" variant="primary" className="w-full" loading={busy} disabled={!form.email.trim()}>
+      <Button
+        type="submit"
+        variant="primary"
+        className="w-full"
+        loading={busy}
+        disabled={!form.email.trim() || (form.note ?? "").trim().length < 10}
+      >
         Request access
       </Button>
     </form>
@@ -113,7 +114,7 @@ export function RequestAccessDialog({ children }: { children: ReactNode }) {
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent
         title="Request access"
-        description="GitPulse is invite-only for now. Tell us a little about you."
+        description="GitPulse is invite-only for now. Leave your email and a short note, and you'll hear back."
       >
         <div className="px-6 py-5">
           {/* Remount on each open so a finished request doesn't stick around. */}

@@ -3,10 +3,12 @@
 import { Activity, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { RequestAccessDialog } from "@/components/access/request-access";
+import { useAuth } from "@/components/auth/auth-provider";
 import { Magnetic } from "@/components/motion/primitives";
 import { Button } from "@/components/ui/button";
 
 export function LandingNav() {
+  const { status } = useAuth();
   return (
     <header className="absolute inset-x-0 top-0 z-50">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
@@ -18,8 +20,14 @@ export function LandingNav() {
         </Link>
 
         <div className="flex items-center gap-2">
+          {/* Signed in: straight to your own dashboard (invite-only screen if
+              you're not invited yet). Otherwise: sign in. */}
           <Button asChild variant="ghost" size="sm">
-            <Link href="/login">Sign in</Link>
+            {status === "authenticated" || status === "forbidden" ? (
+              <Link href="/dashboard">Open my dashboard</Link>
+            ) : (
+              <Link href="/login">Sign in</Link>
+            )}
           </Button>
           <Magnetic strength={0.25}>
             <RequestAccessDialog>

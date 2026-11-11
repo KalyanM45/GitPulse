@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  Eye,
   Github,
   LineChart,
   ShieldCheck,
@@ -164,9 +165,13 @@ export function Hero() {
                 </Button>
               </RequestAccessDialog>
             </Magnetic>
-            {/* Invited users: sign in (if needed) and land on their own dashboard. */}
+            {/* Sign-in required (any account); then a read-only view of the
+                owner's real dashboard. */}
             <Button asChild variant="secondary" size="lg">
-              <Link href="/dashboard">Open my dashboard</Link>
+              <Link href="/demo/dashboard">
+                <Eye className="size-4" />
+                View demo
+              </Link>
             </Button>
             <a
               href="https://github.com/KalyanM45"

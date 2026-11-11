@@ -127,3 +127,16 @@ def test_request_validation_and_rate_limit(client):
 def test_admin_cannot_be_revoked(client):
     r = client.delete(f"/api/admin/invites/{ADMIN}", headers=h(ADMIN))
     assert r.status_code == 400
+
+
+def test_new_request_emails_the_owner_once(client, monkeypatch):
+    from app import notify
+    sent = []
+    monkeypatch.setattr(notify, "access_request_received", lambda email, note: sent.append((email, note)))
+    client.post("/api/access/request", json={"email": "Fan@Example.com", "note": "Love the traffic history"})
+    client.post("/api/access/request", json={"email": "fan@example.com", "note": "edited note"})  # still pending
+    assert sent == [("fan@example.com", "Love the traffic history")]
+    # Already-invited people don't trigger an email (and get the same response).
+    client.post("/api/admin/invites", json={"email": "member@example.com"}, headers=h(ADMIN))
+    client.post("/api/access/request", json={"email": "member@example.com", "note": "x"})
+    assert len(sent) == 1

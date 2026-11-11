@@ -32,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PageHeading, Skeleton } from "@/components/ui/primitives";
 import { comma } from "@/lib/format";
+import { useBasePath } from "@/lib/paths";
 import {
   useContributionYear,
   useContributions,
@@ -57,6 +58,8 @@ const LanguageDonut = dynamic(
 );
 
 export default function DashboardPage() {
+  // "" on the real dashboard, "/demo" in the demo: keeps links in the same section.
+  const base = useBasePath();
   const profile = useProfile();
   const stats = useFollowerStats();
   const repos = useReposOverview();
@@ -234,7 +237,7 @@ export default function DashboardPage() {
           description="Ranked by stars"
           action={
             <Button asChild variant="ghost" size="sm">
-              <Link href="/repositories">View all</Link>
+              <Link href={`${base}/repositories`}>View all</Link>
             </Button>
           }
         />

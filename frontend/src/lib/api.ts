@@ -33,6 +33,19 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 export const API = `${API_BASE.replace(/\/$/, "")}/api`;
 
+/**
+ * The demo (/demo/*) renders the very same dashboard pages, but reads the demo
+ * account's data from /demo/api/* (read-only, see backend/app/demo.py). Decided
+ * per call from the current URL, so the same hooks and pages serve both.
+ */
+export function isDemo(): boolean {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/demo");
+}
+
+function apiRoot(): string {
+  return isDemo() ? `${API_BASE.replace(/\/$/, "")}/demo/api` : API;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -44,7 +57,7 @@ export class ApiError extends Error {
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await authFetch(`${API}${path}`, { signal });
+  const res = await authFetch(`${apiRoot()}${path}`, { signal });
   if (!res.ok) {
     throw new ApiError(
       res.status === 404 ? "Not found" : `Request failed (${res.status})`,
@@ -146,7 +159,7 @@ export const api = {
   syncStatus: (signal?: AbortSignal) => get<SyncStatus>("/sync-status", signal),
 
   sync: async (): Promise<SyncResult> => {
-    const res = await authFetch(`${API}/sync`, { method: "POST" });
+    const res = await authFetch(`${apiRoot()}/sync`, { method: "POST" });
     if (!res.ok) throw new ApiError(`Sync failed (${res.status})`, res.status);
     return res.json() as Promise<SyncResult>;
   },

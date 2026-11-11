@@ -84,8 +84,12 @@ def _hit(key: str, limit: int, window_seconds: int) -> bool:
 
 # ── Requests ─────────────────────────────────────────────────────────────────
 
-def submit_request(email: str, name: str, github: str, note: str, ip: str) -> dict:
-    """Public. Always answers the same way, so it never reveals who is invited."""
+def submit_request(email: str, name: str, github: str, note: str, ip: str) -> tuple[dict, bool]:
+    """Public. Always answers the same way, so it never reveals who is invited.
+
+    Returns (response, notify): `notify` is True when the owner should be emailed
+    (a new request, or a fresh one after an earlier rejection).
+    """
     email = normalize_email(email)
     name = (name or "").strip()[:80]
     github = (github or "").strip().lstrip("@")
@@ -97,7 +101,7 @@ def submit_request(email: str, name: str, github: str, note: str, ip: str) -> di
 
     ok = {"status": "received", "message": "Thanks! Your request has been received."}
     if has_access(email):
-        return ok  # already in; nothing to queue
+        return ok, False  # already in; nothing to queue
 
     existing = _db()["access_requests"].find_one({"email": email})
     if existing and existing["status"] == "pending":
@@ -105,7 +109,7 @@ def submit_request(email: str, name: str, github: str, note: str, ip: str) -> di
         _db()["access_requests"].update_one(
             {"_id": existing["_id"]}, {"$set": {"name": name, "github": github, "note": note}}
         )
-        return ok
+        return ok, False  # already notified about this one
     _db()["access_requests"].update_one(
         {"email": email},
         {
@@ -116,7 +120,7 @@ def submit_request(email: str, name: str, github: str, note: str, ip: str) -> di
         },
         upsert=True,
     )
-    return ok
+    return ok, True
 
 
 def my_request_status(email: str) -> str | None:

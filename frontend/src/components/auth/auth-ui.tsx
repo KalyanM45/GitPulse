@@ -253,9 +253,13 @@ export function useAuthRedirect(serves: "anonymous" | "unverified"): AuthStatus 
   const params = useSearchParams();
   useEffect(() => {
     if (status === "loading" || status === serves) return;
-    if (status === "anonymous") router.replace("/login");
-    else if (status === "unverified") router.replace("/verify-email");
-    else router.replace(safeNext(params.get("next")));
+    // Carry ?next= through sign-in and verification, so e.g. "View demo" lands
+    // on the demo once the visitor has signed up and verified.
+    const next = params.get("next");
+    const keep = next ? `?next=${encodeURIComponent(safeNext(next))}` : "";
+    if (status === "anonymous") router.replace(`/login${keep}`);
+    else if (status === "unverified") router.replace(`/verify-email${keep}`);
+    else router.replace(safeNext(next));
   }, [status, serves, router, params]);
   return status;
 }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useBasePath } from "@/lib/paths";
 import { SidebarProfile } from "./profile-card";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,12 @@ const ADMIN_NAV = { href: "/admin", label: "Access", icon: ShieldCheck };
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { appUser } = useAuth();
-  const items = appUser?.is_admin ? [...NAV, ADMIN_NAV] : NAV;
+  const base = useBasePath();
+  // In the demo, links stay inside /demo and the admin page isn't offered.
+  const items = (appUser?.is_admin && !base ? [...NAV, ADMIN_NAV] : NAV).map((item) => ({
+    ...item,
+    href: `${base}${item.href}`,
+  }));
 
   return (
     <nav className="flex flex-col gap-0.5 px-3" aria-label="Primary">

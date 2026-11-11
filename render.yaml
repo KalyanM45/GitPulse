@@ -28,6 +28,24 @@ services:
         value: invite
       - key: ADMIN_EMAILS
         sync: false
+
+      # Read-only demo of this GitHub account's dashboard at /demo (sign-in needed).
+      - key: DEMO_GITHUB_LOGIN
+        value: KalyanM45
+      - key: DEMO_HIDE_PRIVATE_REPOS
+        value: "true"
+
+      # Email the admins when someone requests access (optional; see docs).
+      - key: APP_URL
+        value: https://gitpulse.vercel.app
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
       # Encrypts users' GitHub tokens in MongoDB. Generated once; never change it
       # (or copy it into the GitHub Actions secret TOKEN_ENCRYPTION_KEY too).
       - key: TOKEN_ENCRYPTION_KEY
