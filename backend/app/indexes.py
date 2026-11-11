@@ -1,14 +1,10 @@
 """Index definitions for every collection, created once at startup.
 
-These used to be created inside `sync_followers`, which meant every sync re-issued
-the whole set — including the legacy-index cleanup, which only ever has something
-to do once. Startup is the right place for it, and it keeps schema concerns out of
-the hot path.
-
-Several collections had no indexes at all beyond `_id`. `star_snapshots` in
-particular holds tens of thousands of rows and is queried per repository on every
-drawer open, and `repo_snapshots` is sorted on nine different fields by the
-repositories table — both were full collection scans.
+Every GitHub-data collection is per user (`owner_id`, see tenant.py), so each index
+leads with owner_id: it both serves the always-present owner filter and makes
+uniqueness per user. Two users can each have a repo called "portfolio" or share a
+follower; the old global unique indexes would have rejected the second one, so they
+are dropped here.
 """
 
 import logging
@@ -26,56 +22,69 @@ _REPO_SORT_FIELDS = [
     "views_all_time", "traffic_views_total",
 ]
 
+# Single-user-era unique indexes, by key. Any of these left in place would stop a
+# second user from storing a row the first user already has.
+_LEGACY_UNIQUE_KEYS = {
+    "follower_snapshots": [[("github_id", 1)], [("login", 1)]],
+    "following_snapshots": [[("github_id", 1)]],
+    "repo_snapshots": [[("name", 1)]],
+    "traffic_daily": [[("repo", 1), ("date", 1)]],
+    "contributions": [[("year", 1)]],
+}
 
-def _drop_legacy_login_unique_index(col) -> None:
-    """The old schema keyed identity on login with a unique index.
 
-    Identity now lives on github_id, and a login must be free to change — a unique
-    index on it makes a rename collide with the renamer's own record.
-    """
-    for name, spec in col.index_information().items():
-        if spec.get("key") == [("login", 1)] and spec.get("unique"):
-            col.drop_index(name)
-            log.info("Dropped legacy unique index %s on follower_snapshots.", name)
+def _drop_legacy_unique_indexes(db) -> None:
+    for col_name, keys in _LEGACY_UNIQUE_KEYS.items():
+        col = db[col_name]
+        for name, spec in col.index_information().items():
+            if spec.get("unique") and spec.get("key") in keys:
+                col.drop_index(name)
+                log.info("Dropped legacy unique index %s on %s.", name, col_name)
 
 
 def ensure_indexes() -> None:
     db = get_db()
+    _drop_legacy_unique_indexes(db)
+
+    O = ("owner_id", 1)
+    # Unique only among documents that have the field (not sparse: with owner_id
+    # always present a sparse compound index would still index missing github_ids).
+    has_gid = {"github_id": {"$exists": True}}
 
     followers = db["follower_snapshots"]
-    _drop_legacy_login_unique_index(followers)
-    # github_id is the identity key — login is a mutable display attribute.
-    # sparse so pre-backfill documents (no github_id yet) don't collide.
-    followers.create_index("github_id", unique=True, sparse=True)
-    followers.create_index("login")
-    followers.create_index([("captured_at", -1), ("login", 1)])
+    followers.create_index([O, ("github_id", 1)], unique=True, partialFilterExpression=has_gid)
+    followers.create_index([O, ("login", 1)])
+    followers.create_index([O, ("captured_at", -1), ("login", 1)])
 
     events = db["follower_events"]
-    events.create_index([("event_type", 1), ("event_at", -1), ("github_id", 1)])
-    events.create_index([("github_id", 1), ("event_at", -1)])
-    events.create_index([("login", 1), ("event_at", -1)])
+    events.create_index([O, ("event_type", 1), ("event_at", -1), ("github_id", 1)])
+    events.create_index([O, ("github_id", 1), ("event_at", -1)])
+    events.create_index([O, ("login", 1), ("event_at", -1)])
 
     following = db["following_snapshots"]
-    following.create_index("github_id", unique=True)
-    following.create_index("login")
-    # The Following tab is ordered by GitHub's own most-recently-followed-first
-    # ordering, which is what `position` preserves.
-    following.create_index([("position", 1), ("login", 1)])
+    following.create_index([O, ("github_id", 1)], unique=True)
+    following.create_index([O, ("login", 1)])
+    # The Following tab is ordered by GitHub's most-recently-followed-first order.
+    following.create_index([O, ("position", 1), ("login", 1)])
 
     repos = db["repo_snapshots"]
-    repos.create_index("name", unique=True)
+    repos.create_index([O, ("name", 1)], unique=True)
     for field in _REPO_SORT_FIELDS:
-        # Tie-broken on name, matching the sort the repositories table issues —
-        # a prefix-only index would still leave the tie-break to an in-memory sort.
-        repos.create_index([(field, -1), ("name", 1)])
+        repos.create_index([O, (field, -1), ("name", 1)])
 
-    # Read once per repository whenever a repo drawer is opened, out of a
-    # collection with tens of thousands of rows.
-    db["star_snapshots"].create_index([("repo", 1), ("captured_at", 1)])
+    db["star_snapshots"].create_index([O, ("repo", 1), ("captured_at", 1)])
 
-    db["traffic_daily"].create_index([("repo", 1), ("date", 1)], unique=True)
-    db["traffic_daily"].create_index([("date", -1)])
+    db["traffic_daily"].create_index([O, ("repo", 1), ("date", 1)], unique=True)
+    db["traffic_daily"].create_index([O, ("date", -1)])
 
-    db["contributions"].create_index("year", unique=True)
+    db["contributions"].create_index([O, ("year", 1)], unique=True)
+
+    # ── Users and jobs ──
+    db["users"].create_index("firebase_uid", unique=True, sparse=True)
+    # One GitPulse account per GitHub account.
+    db["users"].create_index(
+        "github.id", unique=True, partialFilterExpression={"github.id": {"$exists": True}}
+    )
+    db["sync_jobs"].create_index("status")
 
     log.info("Indexes ensured.")

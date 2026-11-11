@@ -2,13 +2,15 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from .config import CORS_ORIGINS
+from .auth.deps import require_tenant
+from .config import ALLOWED_EMAILS, CORS_ORIGINS, FIREBASE_PROJECT_ID
 from .database import close_db, connect
 from .indexes import ensure_indexes
+from .routes.auth import router as auth_router
 from .routes.contributions import router as contributions_router
 from .routes.followers import router as followers_router
 from .routes.repos import router as repos_router
@@ -30,10 +32,18 @@ async def lifespan(app: FastAPI):
     # running deployment, so a few seconds of overlap is harmless.
     threading.Thread(target=_ensure_indexes_quietly, name="ensure-indexes", daemon=True).start()
 
+    _warn_about_auth_config()
     start_scheduler()
     yield
     stop_scheduler()
     close_db()
+
+
+def _warn_about_auth_config() -> None:
+    if not FIREBASE_PROJECT_ID:
+        log.error("FIREBASE_PROJECT_ID is not set: every API request will be rejected as unauthenticated.")
+    if not ALLOWED_EMAILS:
+        log.info("ALLOWED_EMAILS is not set: open sign-up (each user only sees their own data).")
 
 
 def _ensure_indexes_quietly() -> None:
@@ -67,9 +77,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(followers_router)
-app.include_router(repos_router)
-app.include_router(contributions_router)
+# Auth/GitHub-connection routes check the user themselves. Everything else under
+# /api is GitHub data: it needs a signed-in user with GitHub connected, and is
+# scoped to that user's data (see tenant.py).
+app.include_router(auth_router)
+_protected = [Depends(require_tenant)]
+app.include_router(followers_router, dependencies=_protected)
+app.include_router(repos_router, dependencies=_protected)
+app.include_router(contributions_router, dependencies=_protected)
 
 
 @app.get("/health")

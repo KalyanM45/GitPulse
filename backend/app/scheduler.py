@@ -9,8 +9,10 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .config import SYNC_INTERVAL_MINUTES
+from .github_account import iter_tenants
 from .services.follower_service import sync_followers
 from .services.sync_state import mark_synced
+from .tenant import use
 
 log = logging.getLogger(__name__)
 
@@ -20,12 +22,14 @@ _scheduler = BackgroundScheduler()
 def _run_follower_sync():
     """Wrapped so a failure is logged rather than swallowed by APScheduler, and so
     the sync marker only moves when the sync actually succeeded."""
-    try:
-        result = sync_followers()
-        mark_synced()
-        log.info("Scheduled follower sync: %s", result)
-    except Exception:
-        log.exception("Scheduled follower sync failed.")
+    for tenant in iter_tenants():
+        with use(tenant):
+            try:
+                result = sync_followers()
+                mark_synced()
+                log.info("Scheduled follower sync for @%s: %s", tenant.github_login, result)
+            except Exception:
+                log.exception("Scheduled follower sync failed for @%s.", tenant.github_login)
 
 
 def start_scheduler():

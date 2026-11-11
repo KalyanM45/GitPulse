@@ -1,9 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Menu, RefreshCw, TriangleAlert } from "lucide-react";
+import { Check, LogOut, Menu, RefreshCw, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/overlays";
 import { Skeleton } from "@/components/ui/primitives";
@@ -41,6 +42,7 @@ function Toast({ tone, children }: { tone: "ok" | "err"; children: React.ReactNo
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { data: profile, isLoading } = useProfile();
   const sync = useSync();
+  const { user, signOut } = useAuth();
   // Mounted here because the Topbar is on every page of the app, so the watcher
   // runs wherever the user happens to be sitting.
   useSyncWatcher();
@@ -125,6 +127,12 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
                 </span>
               </a>
             ) : null}
+
+            <Tooltip content={user ? `Signed in as ${user.email}. Sign out` : "Sign out"}>
+              <Button variant="ghost" size="icon" onClick={() => signOut()} aria-label="Sign out" className="size-9">
+                <LogOut className="size-4" />
+              </Button>
+            </Tooltip>
           </div>
         </div>
       </header>

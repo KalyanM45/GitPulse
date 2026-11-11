@@ -15,16 +15,17 @@ outage should not blank out the avatar in the header.
 import logging
 from datetime import datetime, timedelta, timezone
 
-from ..database import get_db
+from ..tenant import tenant_db as get_db
+from ..tenant import current
 from .github_service import fetch_my_profile
 
 log = logging.getLogger(__name__)
 
 PROFILE_TTL = timedelta(hours=6)
 
-# Fixed _id: there is exactly one profile, so this is an upsert into one document
-# rather than a collection that grows.
-_DOC_ID = "profile"
+# One document per user, so this is an upsert rather than a collection that grows.
+def _doc_id() -> str:
+    return f"profile:{current().user_id}"
 
 
 def _col():
@@ -44,13 +45,13 @@ def _fresh(cached: dict | None) -> bool:
 def store_profile(profile: dict) -> dict:
     """Write a freshly fetched profile. Returns what was stored."""
     doc = {**profile, "fetched_at": datetime.now(timezone.utc)}
-    _col().update_one({"_id": _DOC_ID}, {"$set": {"profile": doc}}, upsert=True)
+    _col().update_one({"_id": _doc_id()}, {"$set": {"profile": doc}}, upsert=True)
     return doc
 
 
 def get_profile(force: bool = False) -> dict:
     """Your profile, from cache unless it is stale (or `force`)."""
-    row = _col().find_one({"_id": _DOC_ID}, {"profile": 1, "_id": 0}) or {}
+    row = _col().find_one({"_id": _doc_id()}, {"profile": 1, "_id": 0}) or {}
     cached = row.get("profile")
 
     if cached and not force and _fresh(cached):

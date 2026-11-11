@@ -1,14 +1,50 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth/auth-provider";
+import { AuthLoading, AuthShell } from "@/components/auth/auth-ui";
+import { Button } from "@/components/ui/button";
 import { MobileSidebar, Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [menu, setMenu] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { status, user, appUser, signOut } = useAuth();
+
+  // Not ready for the dashboard yet: no GitHub connected, or nothing synced so far.
+  // (appUser is null only if the API was unreachable: let the dashboard handle that.)
+  const needsOnboarding =
+    !!appUser && (!appUser.github.connected || !!appUser.github.needs_reconnect || !appUser.last_synced_at);
+
+  // Every page in this group needs a signed-in, verified user with GitHub data.
+  useEffect(() => {
+    if (status === "anonymous") router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    else if (status === "unverified") router.replace("/verify-email");
+    else if (status === "authenticated" && needsOnboarding) router.replace("/connect");
+  }, [status, needsOnboarding, pathname, router]);
+
+  if (status === "forbidden") {
+    return (
+      <AuthShell
+        title="No access yet"
+        subtitle={
+          <>
+            You&apos;re signed in as <span className="font-medium text-ink-2">{user?.email}</span>, but this
+            account hasn&apos;t been given access to GitPulse.
+          </>
+        }
+      >
+        <Button variant="secondary" className="w-full" onClick={() => signOut()}>
+          Sign out
+        </Button>
+      </AuthShell>
+    );
+  }
+  if (status !== "authenticated" || needsOnboarding) return <AuthLoading />;
 
   return (
     <div className="relative min-h-dvh">

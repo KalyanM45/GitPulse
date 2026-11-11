@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from pymongo.collection import Collection
-from ..database import get_db
+from ..tenant import tenant_db as get_db
 from ..models.follower import make_follower_snapshot, make_follower_event
 from .github_service import fetch_all_followers, fetch_user_by_login, fetch_user_profiles
 
@@ -61,7 +61,7 @@ def sync_followers() -> dict:
     current_ids = set(current_map)
     by_login = {u["login"]: u for u in raw}
 
-    stored_docs = list(_snapshots_col().find({}, {"_id": 0}))
+    stored_docs = list(_snapshots_col().find({}, {"_id": 0, "owner_id": 0}))
 
     if not current_ids and stored_docs:
         raise RuntimeError(
@@ -201,7 +201,7 @@ def get_current_followers(page: int = 1, per_page: int = 30, search: str = "") -
     col = _snapshots_col()
     query = _search_filter(search)
     total = col.count_documents(query)
-    docs = list(col.find(query, {"_id": 0}).sort(
+    docs = list(col.find(query, {"_id": 0, "owner_id": 0}).sort(
         [("captured_at", -1), ("login", 1)]
     ).skip((page - 1) * per_page).limit(per_page))
     for d in docs:
@@ -322,7 +322,7 @@ def get_follower_history(login: str) -> list[dict]:
         gid = (ev or {}).get("github_id")
 
     query = {"$or": [{"github_id": gid}, {"login": login}]} if gid else {"login": login}
-    docs = list(col.find(query, {"_id": 0}).sort("event_at", 1))
+    docs = list(col.find(query, {"_id": 0, "owner_id": 0}).sort("event_at", 1))
     for d in docs:
         for key in ("event_at", "created_at"):
             if isinstance(d.get(key), datetime):

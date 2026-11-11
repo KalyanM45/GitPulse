@@ -1,9 +1,10 @@
 import logging
+import re
 from datetime import datetime, timezone
 
 import requests
 
-from ..database import get_db
+from ..tenant import tenant_db as get_db
 from .github_service import (
     fetch_all_repos,
     fetch_repo_branch_count,
@@ -22,13 +23,6 @@ log = logging.getLogger(__name__)
 
 def _traffic_col():
     return get_db()["traffic_daily"]
-
-
-def _ensure_traffic_indexes():
-    # One document per repo per day. The unique key is what makes re-syncing the
-    # same 14-day window idempotent instead of double-counting.
-    _traffic_col().create_index([("repo", 1), ("date", 1)], unique=True)
-    _traffic_col().create_index([("date", -1)])
 
 
 def _store_daily_traffic(repo: str, views_days: list, clones_days: list) -> None:
@@ -98,7 +92,7 @@ def get_traffic_series(repo: str) -> list[dict]:
     """Day-wise traffic for one repo, oldest first — the accumulated history."""
     return list(
         _traffic_col()
-        .find({"repo": repo}, {"_id": 0})
+        .find({"repo": repo}, {"_id": 0, "owner_id": 0})
         .sort("date", 1)
     )
 
@@ -107,7 +101,6 @@ def sync_repos() -> dict:
     db = get_db()
     col = db["repo_snapshots"]
     synced_at = datetime.now(timezone.utc)
-    _ensure_traffic_indexes()
 
     # Traffic needs push access on the token. A token without the `repo` /
     # `public_repo` scope gets a 403 on every repo — which used to be swallowed
@@ -256,7 +249,7 @@ def sync_repos() -> dict:
 
     if traffic_denied:
         log.warning(
-            "Traffic denied for %d/%d repos (403/404). The GITHUB_TOKEN needs the "
+            "Traffic denied for %d/%d repos (403/404). The connected GitHub account needs the "
             "`public_repo` scope (or `repo` for private repos) — GitHub requires push "
             "access for the traffic API. Views and clones will read 0 until this is fixed.",
             traffic_denied,
@@ -306,7 +299,7 @@ def get_repos(
     col = get_db()["repo_snapshots"]
     query: dict = {}
     if search:
-        query["name"] = {"$regex": search, "$options": "i"}
+        query["name"] = {"$regex": re.escape(search), "$options": "i"}
 
     if visibility == "public":
         query["is_private"] = False
@@ -320,7 +313,7 @@ def get_repos(
     total = col.count_documents(query)
     skip = (page - 1) * per_page
 
-    cursor = col.find(query, {"_id": 0})
+    cursor = col.find(query, {"_id": 0, "owner_id": 0})
 
     if sort == "name":
         # Collation strength 1 makes A–Z case- and accent-insensitive, so "Zebra"
@@ -341,7 +334,7 @@ def get_repos(
 
 
 def get_repo(name: str) -> dict | None:
-    return get_db()["repo_snapshots"].find_one({"name": name}, {"_id": 0})
+    return get_db()["repo_snapshots"].find_one({"name": name}, {"_id": 0, "owner_id": 0})
 
 
 def get_star_history(repo_name: str) -> list:

@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import { TooltipProvider } from "@/components/ui/overlays";
 import { ApiError } from "@/lib/api";
 import { persistCache, restoreCache } from "@/lib/persist";
@@ -38,6 +39,8 @@ export function Providers({ children }: { children: ReactNode }) {
             retry: (failureCount, error) => {
               // Don't retry a 404 — the resource genuinely isn't there.
               if (error instanceof ApiError && error.status === 404) return false;
+              // 401 already went through a token refresh; retrying can't help.
+              if (error instanceof ApiError && error.status === 401) return false;
               return failureCount < 2;
             },
           },
@@ -58,11 +61,13 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={client}>
-      <PrefsProvider>
-        <TooltipProvider delayDuration={220} skipDelayDuration={400}>
-          {children}
-        </TooltipProvider>
-      </PrefsProvider>
+      <AuthProvider>
+        <PrefsProvider>
+          <TooltipProvider delayDuration={220} skipDelayDuration={400}>
+            {children}
+          </TooltipProvider>
+        </PrefsProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

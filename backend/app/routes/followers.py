@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Query, HTTPException
 from ..services import follower_service, following_service
-from ..services import repo_service, contributions_service
+from ..services import sync_runner
 from ..services import profile_service, sync_state
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["analytics"])
 
@@ -29,26 +33,12 @@ def sync_status():
 @router.post("/sync")
 def trigger_sync():
     try:
-        # We are already authenticated against GitHub here, so refresh the cached
-        # profile in the same pass rather than making page loads pay for it.
-        profile_service.get_profile(force=True)
-        followers_result = follower_service.sync_followers()
-        following_count  = following_service.sync_following()
-        repo_result      = repo_service.sync_repos()
-        contrib_result   = contributions_service.sync_contributions()
-        # Stamped last, so it only moves when every step above actually finished.
-        # Returned to the caller as `synced_at` so the browser can recognise this
-        # sync when it next polls /api/sync-status and skip a redundant refresh.
-        synced_at = sync_state.mark_synced()
-        return {
-            **followers_result,
-            "synced_at":           synced_at,
-            "total_following":     following_count,
-            "total_repos":         repo_result["total_repos"],
-            "total_contributions": contrib_result["total_contributions"],
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # `synced_at` lets the browser recognise this sync when it next polls
+        # /api/sync-status and skip a redundant refresh.
+        return sync_runner.run_full_sync()
+    except Exception:
+        log.exception("Manual sync failed")
+        raise HTTPException(status_code=500, detail="Sync failed. Please try again.")
 
 
 # ── Followers ──────────────────────────────────────────────────────────────

@@ -3,13 +3,24 @@ import time
 
 import requests
 
-from ..config import GITHUB_TOKEN, GITHUB_USERNAME
+from ..tenant import current
 
-HEADERS = {
-    "Accept": "application/vnd.github+json",
-    "Authorization": f"Bearer {GITHUB_TOKEN}",
-    "X-GitHub-Api-Version": "2022-11-28",
-}
+
+def _headers(token: str | None = None) -> dict:
+    """Headers for the current user's GitHub token (or an explicit one)."""
+    return {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token or current().github_token}",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+
+def fetch_viewer(token: str) -> tuple[dict, set[str]]:
+    """Who a token belongs to, and the scopes it was granted. Raises on a bad token."""
+    resp = requests.get("https://api.github.com/user", headers=_headers(token), timeout=15)
+    resp.raise_for_status()
+    scopes = {x.strip() for x in resp.headers.get("X-OAuth-Scopes", "").split(",") if x.strip()}
+    return resp.json(), scopes
 
 
 def _paginate(url: str, extra_params: dict = None) -> list[dict]:
@@ -18,7 +29,7 @@ def _paginate(url: str, extra_params: dict = None) -> list[dict]:
         params = {"per_page": 100, "page": page}
         if extra_params:
             params.update(extra_params)
-        resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
+        resp = requests.get(url, headers=_headers(), params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         if not data:
@@ -29,7 +40,7 @@ def _paginate(url: str, extra_params: dict = None) -> list[dict]:
 
 
 def fetch_all_followers() -> list[dict]:
-    return _paginate(f"https://api.github.com/users/{GITHUB_USERNAME}/followers")
+    return _paginate(f"https://api.github.com/users/{current().github_login}/followers")
 
 
 def fetch_all_following() -> list[dict]:
@@ -38,7 +49,7 @@ def fetch_all_following() -> list[dict]:
 
 def fetch_user_by_login(login: str) -> dict | None:
     """Returns None if the login no longer resolves (renamed or deleted account)."""
-    resp = requests.get(f"https://api.github.com/users/{login}", headers=HEADERS, timeout=15)
+    resp = requests.get(f"https://api.github.com/users/{login}", headers=_headers(), timeout=15)
     if resp.status_code == 404:
         return None
     resp.raise_for_status()
@@ -47,7 +58,7 @@ def fetch_user_by_login(login: str) -> dict | None:
 
 def fetch_user_by_id(user_id: int) -> dict | None:
     """Resolve a user by immutable numeric id — survives username changes."""
-    resp = requests.get(f"https://api.github.com/user/{user_id}", headers=HEADERS, timeout=15)
+    resp = requests.get(f"https://api.github.com/user/{user_id}", headers=_headers(), timeout=15)
     if resp.status_code == 404:
         return None
     resp.raise_for_status()
@@ -55,7 +66,7 @@ def fetch_user_by_id(user_id: int) -> dict | None:
 
 
 def fetch_my_profile() -> dict:
-    resp = requests.get("https://api.github.com/user", headers=HEADERS, timeout=15)
+    resp = requests.get("https://api.github.com/user", headers=_headers(), timeout=15)
     resp.raise_for_status()
     p = resp.json()
 
@@ -92,37 +103,37 @@ def fetch_all_repos() -> list[dict]:
 
 
 def fetch_repo_languages(full_name: str) -> dict:
-    resp = requests.get(f"https://api.github.com/repos/{full_name}/languages", headers=HEADERS, timeout=15)
+    resp = requests.get(f"https://api.github.com/repos/{full_name}/languages", headers=_headers(), timeout=15)
     resp.raise_for_status()
     return resp.json()
 
 
 def fetch_repo_traffic_views(full_name: str) -> dict:
-    resp = requests.get(f"https://api.github.com/repos/{full_name}/traffic/views", headers=HEADERS, timeout=15)
+    resp = requests.get(f"https://api.github.com/repos/{full_name}/traffic/views", headers=_headers(), timeout=15)
     resp.raise_for_status()
     return resp.json()
 
 
 def fetch_repo_traffic_clones(full_name: str) -> dict:
-    resp = requests.get(f"https://api.github.com/repos/{full_name}/traffic/clones", headers=HEADERS, timeout=15)
+    resp = requests.get(f"https://api.github.com/repos/{full_name}/traffic/clones", headers=_headers(), timeout=15)
     resp.raise_for_status()
     return resp.json()
 
 
 def fetch_repo_subscribers(full_name: str) -> int:
-    resp = requests.get(f"https://api.github.com/repos/{full_name}", headers=HEADERS, timeout=15)
+    resp = requests.get(f"https://api.github.com/repos/{full_name}", headers=_headers(), timeout=15)
     resp.raise_for_status()
     return resp.json().get("subscribers_count", 0)
 
 
 def fetch_repo_referrers(full_name: str) -> list:
-    resp = requests.get(f"https://api.github.com/repos/{full_name}/traffic/referrers", headers=HEADERS, timeout=15)
+    resp = requests.get(f"https://api.github.com/repos/{full_name}/traffic/referrers", headers=_headers(), timeout=15)
     resp.raise_for_status()
     return resp.json() or []
 
 
 def fetch_repo_popular_paths(full_name: str) -> list:
-    resp = requests.get(f"https://api.github.com/repos/{full_name}/traffic/popular/paths", headers=HEADERS, timeout=15)
+    resp = requests.get(f"https://api.github.com/repos/{full_name}/traffic/popular/paths", headers=_headers(), timeout=15)
     resp.raise_for_status()
     return resp.json() or []
 
@@ -130,7 +141,7 @@ def fetch_repo_popular_paths(full_name: str) -> list:
 def fetch_user_created_year() -> int:
     resp = requests.post(
         "https://api.github.com/graphql",
-        headers={**HEADERS, "Accept": "application/json"},
+        headers={**_headers(), "Accept": "application/json"},
         json={"query": "{ viewer { createdAt } }"},
         timeout=15,
     )
@@ -155,7 +166,7 @@ def fetch_contributions_graphql(username: str, year: int = None) -> dict:
     )
     resp = requests.post(
         "https://api.github.com/graphql",
-        headers={**HEADERS, "Accept": "application/json"},
+        headers={**_headers(), "Accept": "application/json"},
         json={"query": query, "variables": {"login": username}},
         timeout=30,
     )
@@ -188,7 +199,7 @@ def fetch_repo_commit_count(full_name: str) -> int:
     """
     resp = requests.get(
         f"https://api.github.com/repos/{full_name}/commits",
-        headers=HEADERS,
+        headers=_headers(),
         params={"per_page": 1},
         timeout=20,
     )
@@ -207,7 +218,7 @@ def fetch_repo_branch_count(full_name: str) -> int:
     """Branch count via the pagination header — avoids pulling every branch object."""
     resp = requests.get(
         f"https://api.github.com/repos/{full_name}/branches",
-        headers=HEADERS,
+        headers=_headers(),
         params={"per_page": 1},
         timeout=15,
     )
@@ -240,7 +251,7 @@ def fetch_user_profiles(logins: list[str]) -> dict[str, str]:
         )
         resp = requests.post(
             "https://api.github.com/graphql",
-            headers={**HEADERS, "Accept": "application/json"},
+            headers={**_headers(), "Accept": "application/json"},
             json={"query": f"{{ {fields} }}"},
             timeout=30,
         )
@@ -271,7 +282,7 @@ def fetch_repo_commit_activity(full_name: str, retries: int = 3) -> list | None:
     for attempt in range(retries):
         resp = requests.get(
             f"https://api.github.com/repos/{full_name}/stats/commit_activity",
-            headers=HEADERS,
+            headers=_headers(),
             timeout=30,
         )
         if resp.status_code == 202:

@@ -14,12 +14,20 @@ services:
     healthCheckPath: /health
     envVars:
       # Never commit these — Render asks for them on first deploy.
-      - key: GITHUB_TOKEN
-        sync: false
       - key: GITHUB_USERNAME
         sync: false
       - key: MONGODB_URI
         sync: false
+
+      # Auth (Firebase). The project ID is public; ALLOWED_EMAILS limits who gets in.
+      - key: FIREBASE_PROJECT_ID
+        value: gitpulse2026
+      - key: ALLOWED_EMAILS
+        sync: false
+      # Encrypts users' GitHub tokens in MongoDB. Generated once; never change it
+      # (or copy it into the GitHub Actions secret TOKEN_ENCRYPTION_KEY too).
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
 
       - key: DB_NAME
         value: github_analytics

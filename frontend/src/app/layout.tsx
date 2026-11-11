@@ -36,7 +36,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
-      <body className="min-h-dvh bg-base antialiased">
+      {/* suppressHydrationWarning: extensions like Grammarly add attributes to <body>
+          before React loads. This silences only this element's own attributes. */}
+      <body className="min-h-dvh bg-base antialiased" suppressHydrationWarning>
         {/* Skip link — first thing in the tab order. */}
         <a
           href="#main"

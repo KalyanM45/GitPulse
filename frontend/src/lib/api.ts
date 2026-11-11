@@ -13,6 +13,7 @@ import type {
   SyncStatus,
   TrafficDay,
 } from "./types";
+import { authFetch } from "./auth";
 
 /**
  * Where the backend lives. Set via NEXT_PUBLIC_API_BASE:
@@ -43,7 +44,7 @@ export class ApiError extends Error {
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API}${path}`, { signal });
+  const res = await authFetch(`${API}${path}`, { signal });
   if (!res.ok) {
     throw new ApiError(
       res.status === 404 ? "Not found" : `Request failed (${res.status})`,
@@ -145,7 +146,7 @@ export const api = {
   syncStatus: (signal?: AbortSignal) => get<SyncStatus>("/sync-status", signal),
 
   sync: async (): Promise<SyncResult> => {
-    const res = await fetch(`${API}/sync`, { method: "POST" });
+    const res = await authFetch(`${API}/sync`, { method: "POST" });
     if (!res.ok) throw new ApiError(`Sync failed (${res.status})`, res.status);
     return res.json() as Promise<SyncResult>;
   },

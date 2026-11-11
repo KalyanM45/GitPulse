@@ -1,9 +1,7 @@
 import re
 from datetime import datetime, timezone
 
-from pymongo import UpdateOne
-
-from ..database import get_db
+from ..tenant import tenant_db as get_db
 from .github_service import fetch_all_following, fetch_user_profiles
 
 
@@ -41,8 +39,8 @@ def sync_following() -> int:
     except Exception:
         names = {}
 
-    col.bulk_write([
-        UpdateOne(
+    col.bulk_upsert([
+        (
             {"github_id": u["id"]},
             {
                 "$set": {
@@ -61,7 +59,6 @@ def sync_following() -> int:
                 # account. Everything above is refreshed every run; this is not.
                 "$setOnInsert": {"captured_at": now},
             },
-            upsert=True,
         )
         for idx, u in enumerate(raw)
     ], ordered=False)
@@ -81,7 +78,7 @@ def get_following(page: int = 1, per_page: int = 30, search: str = "") -> dict:
         if search.strip() else {}
     )
     total = col.count_documents(query)
-    docs = list(col.find(query, {"_id": 0, "position": 0}).sort(
+    docs = list(col.find(query, {"_id": 0, "position": 0, "owner_id": 0}).sort(
         [("position", 1), ("login", 1)]
     ).skip((page - 1) * per_page).limit(per_page))
     for d in docs:

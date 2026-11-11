@@ -1,10 +1,13 @@
 """
-Standalone sync script — runs without the FastAPI server.
-Used by GitHub Actions for scheduled midnight IST syncs.
+Standalone sync for every connected user — runs without the FastAPI server.
+Used by the GitHub Actions cron (.github/workflows/auto_sync.yml).
+
+Needs MONGODB_URI, DB_NAME and TOKEN_ENCRYPTION_KEY (the same key as the API, to
+decrypt each user's stored GitHub token).
 """
+import logging
 import os
 import sys
-import logging
 from datetime import datetime, timezone
 
 # Allow importing from backend/
@@ -13,13 +16,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "backend", ".env"))
 
-from app.indexes import ensure_indexes
-from app.services.follower_service import sync_followers
-from app.services.following_service import sync_following
-from app.services.repo_service import sync_repos
-from app.services.contributions_service import sync_contributions
-from app.services.profile_service import get_profile
-from app.services.sync_state import mark_synced
+from app.github_account import iter_tenants  # noqa: E402
+from app.indexes import ensure_indexes  # noqa: E402
+from app.services.sync_runner import run_full_sync  # noqa: E402
+from app.tenant import use  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,64 +30,34 @@ log = logging.getLogger(__name__)
 
 
 def main():
-    required = ["GITHUB_TOKEN", "GITHUB_USERNAME", "MONGODB_URI"]
-    missing = [k for k in required if not os.getenv(k)]
+    missing = [k for k in ["MONGODB_URI", "TOKEN_ENCRYPTION_KEY"] if not os.getenv(k)]
     if missing:
         log.error("Missing required environment variables: %s", ", ".join(missing))
         sys.exit(1)
 
     log.info("Starting sync at %s UTC", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
-
-    # The API creates these at startup; this process never boots the API, so
-    # without it a scheduled run can write into unindexed collections — including
-    # the uniques the upserts rely on.
+    # The API creates these at startup; this process never boots the API.
     ensure_indexes()
 
-    # Refresh the cached profile that GET /api/profile serves, so the dashboard is
-    # not the thing that has to go and fetch it.
-    try:
-        get_profile(force=True)
-        log.info("Profile refreshed.")
-    except Exception as e:
-        log.warning("Profile refresh failed (non-fatal): %s", e)
+    ok = failed = 0
+    for tenant in iter_tenants():
+        with use(tenant):
+            try:
+                r = run_full_sync()
+                ok += 1
+                log.info(
+                    "@%s synced — followers %d (+%d / -%d), repos %d",
+                    tenant.github_login, r["total_followers"], r["new_followers"],
+                    r["lost_followers"], r["total_repos"],
+                )
+            except Exception:
+                failed += 1
+                # One user's revoked token or rate limit must not stop everyone else.
+                log.exception("Sync failed for @%s", tenant.github_login)
 
-    try:
-        result = sync_followers()
-        log.info(
-            "Followers synced — total: %d  new: %d  lost: %d",
-            result["total_followers"],
-            result["new_followers"],
-            result["lost_followers"],
-        )
-    except Exception as e:
-        log.error("Follower sync failed: %s", e)
+    log.info("Sync complete: %d succeeded, %d failed.", ok, failed)
+    if failed and not ok:
         sys.exit(1)
-
-    try:
-        following_count = sync_following()
-        log.info("Following synced — total: %d", following_count)
-    except Exception as e:
-        log.error("Following sync failed: %s", e)
-        sys.exit(1)
-
-    try:
-        repo_result = sync_repos()
-        log.info("Repos synced — total: %d", repo_result["total_repos"])
-    except Exception as e:
-        log.error("Repo sync failed: %s", e)
-        sys.exit(1)
-
-    try:
-        contrib_result = sync_contributions()
-        log.info("Contributions synced — total: %d", contrib_result["total_contributions"])
-    except Exception as e:
-        log.error("Contributions sync failed: %s", e)
-        sys.exit(1)
-
-    # Only after every step succeeded — this is what tells open browser tabs that
-    # their data is stale and needs refetching.
-    mark_synced()
-    log.info("Sync complete.")
 
 
 if __name__ == "__main__":

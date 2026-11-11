@@ -10,7 +10,7 @@ on:
 
 jobs:
   sync:
-    name: Sync followers & following
+    name: Sync all connected users
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -30,10 +30,11 @@ jobs:
 
       - name: Run sync
         env:
-          # Name your repo secret GH_ANALYTICS_TOKEN (not GITHUB_TOKEN — that's reserved by GHA)
-          # and map it here so the backend code sees GITHUB_TOKEN
-          GITHUB_TOKEN: ${{ secrets.GH_ANALYTICS_TOKEN }}
-          GITHUB_USERNAME: ${{ secrets.GH_USERNAME }}
+          # Each user's GitHub token is stored encrypted in MongoDB; this key (the
+          # same TOKEN_ENCRYPTION_KEY the API uses) decrypts them.
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           DB_NAME: ${{ secrets.DB_NAME }}
+          TOKEN_ENCRYPTION_KEY: ${{ secrets.TOKEN_ENCRYPTION_KEY }}
+          # Legacy single-user account: its pre-multi-user history goes to whoever connects it.
+          GITHUB_USERNAME: ${{ secrets.GH_USERNAME }}
         run: python scripts/sync.py

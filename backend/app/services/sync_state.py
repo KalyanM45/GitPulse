@@ -11,9 +11,13 @@ everything when it moves, which is far cheaper than polling the real endpoints.
 
 from datetime import datetime, timezone
 
-from ..database import get_db
+from ..tenant import tenant_db as get_db
 
-_DOC_ID = "sync"
+from ..tenant import current
+
+
+def _doc_id() -> str:
+    return f"sync:{current().user_id}"
 
 
 def _col():
@@ -22,7 +26,7 @@ def _col():
 
 def status() -> dict:
     """Small enough to poll. Deliberately carries nothing but the timestamp."""
-    doc = _col().find_one({"_id": _DOC_ID}, {"last_sync_at": 1, "_id": 0}) or {}
+    doc = _col().find_one({"_id": _doc_id()}, {"last_sync_at": 1, "_id": 0}) or {}
     at = doc.get("last_sync_at")
     return {"last_sync_at": at.isoformat() if isinstance(at, datetime) else None}
 
@@ -41,7 +45,7 @@ def mark_synced() -> str:
     refetch of everything.
     """
     _col().update_one(
-        {"_id": _DOC_ID},
+        {"_id": _doc_id()},
         {"$set": {"last_sync_at": datetime.now(timezone.utc)}},
         upsert=True,
     )

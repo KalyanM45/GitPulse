@@ -1,17 +1,18 @@
 from datetime import datetime, timezone
-from ..database import get_db
+from ..tenant import tenant_db as get_db
 from .github_service import fetch_contributions_graphql, fetch_user_created_year
-from ..config import GITHUB_USERNAME
+from ..tenant import current
 
 
 def sync_contributions() -> dict:
     db  = get_db()
     col = db["contributions"]
+    username = current().github_login
     synced_at    = datetime.now(timezone.utc)
     current_year = synced_at.year
 
     # Remove legacy docs that have no year field
-    col.delete_many({"username": GITHUB_USERNAME, "year": {"$exists": False}})
+    col.delete_many({"year": {"$exists": False}})
 
     created_year   = fetch_user_created_year()
     total_all_time = 0
@@ -19,12 +20,12 @@ def sync_contributions() -> dict:
 
     for year in range(created_year, current_year + 1):
         try:
-            data = fetch_contributions_graphql(GITHUB_USERNAME, year)
+            data = fetch_contributions_graphql(username, year)
         except Exception:
             continue
         total_all_time += data["total_contributions"]
         doc = {
-            "username":            GITHUB_USERNAME,
+            "username":            username,
             "year":                year,
             "synced_at":           synced_at,
             "total_contributions": data["total_contributions"],
@@ -35,7 +36,7 @@ def sync_contributions() -> dict:
             "restricted":          data.get("restricted", 0),
             "weeks":               data["weeks"],
         }
-        col.replace_one({"username": GITHUB_USERNAME, "year": year}, doc, upsert=True)
+        col.replace_one({"year": year}, doc, upsert=True)
         years_synced += 1
 
     return {
@@ -57,7 +58,7 @@ def get_contributions_summary(with_latest: bool = False) -> dict:
     docs = list(
         get_db()["contributions"]
         .find(
-            {"username": GITHUB_USERNAME, "year": {"$exists": True}},
+            {"year": {"$exists": True}},
             {"_id": 0, "year": 1, "total_contributions": 1, "total_commits": 1,
              "total_issues": 1, "total_prs": 1, "total_reviews": 1, "synced_at": 1},
         )
@@ -84,7 +85,7 @@ def get_contributions_summary(with_latest: bool = False) -> dict:
 
 def get_contributions_year(year: int) -> dict | None:
     doc = get_db()["contributions"].find_one(
-        {"username": GITHUB_USERNAME, "year": year}, {"_id": 0}
+        {"year": year}, {"_id": 0, "owner_id": 0}
     )
     if doc and doc.get("synced_at"):
         doc["synced_at"] = doc["synced_at"].isoformat()
