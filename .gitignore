@@ -36,3 +36,6 @@ infra/*.tfstate
 infra/*.tfstate.*
 infra/terraform.tfvars
 infra/*.tfplan
+
+# Private developer notes (deployment, secrets locations, costs). Local only.
+docs/developer/
