@@ -34,8 +34,24 @@ STEPS = [
 _STALE_AFTER = timedelta(minutes=30)
 
 
+def is_unauthorized(e: Exception) -> bool:
+    return isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code == 401
+
+
 def run_full_sync(progress: Callable[[str], None] = lambda step: None) -> dict:
-    """Sync everything for the user in scope. Raises on failure."""
+    """Sync everything for the user in scope. Raises on failure; a token GitHub
+    rejects is also flagged so the user is asked to reconnect."""
+    from ..github_account import mark_token_revoked
+
+    try:
+        return _run_full_sync(progress)
+    except requests.HTTPError as e:
+        if is_unauthorized(e):
+            mark_token_revoked(current().user_id)
+        raise
+
+
+def _run_full_sync(progress: Callable[[str], None]) -> dict:
     from ..github_account import adopt_legacy_data
 
     adopt_legacy_data(current())
@@ -135,7 +151,7 @@ def _run(tenant: Tenant) -> None:
             log.exception("Sync failed for %s", tenant.github_login)
             message = "Something went wrong while syncing. Please try again."
             if isinstance(e, requests.HTTPError) and e.response is not None:
-                if e.response.status_code == 401:
+                if is_unauthorized(e):
                     message = "GitHub access was revoked. Reconnect your GitHub account."
                 elif e.response.status_code == 403:
                     message = "GitHub's rate limit was hit. The sync will work again within an hour."

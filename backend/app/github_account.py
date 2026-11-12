@@ -70,9 +70,22 @@ def tenant_for(user: dict) -> Tenant | None:
     return Tenant(user_id=user["_id"], github_id=gh["id"], github_login=gh["login"], github_token=token)
 
 
+def mark_token_revoked(user_id) -> None:
+    """GitHub rejected this user's token (401): revoked, expired or replaced.
+
+    Flagged so the app asks them to reconnect and scheduled syncs stop retrying a
+    token that can't work. Connecting again rewrites `github`, clearing the flag.
+    """
+    _users().update_one(
+        {"_id": user_id, "github.token_enc": {"$exists": True}},
+        {"$set": {"github.token_revoked_at": datetime.now(timezone.utc)}},
+    )
+
+
 def iter_tenants() -> Iterator[Tenant]:
     """Every user with a usable GitHub connection — for scheduled syncs."""
-    for user in _users().find({"github.token_enc": {"$exists": True}}):
+    query = {"github.token_enc": {"$exists": True}, "github.token_revoked_at": {"$exists": False}}
+    for user in _users().find(query):
         t = tenant_for(user)
         if t:
             yield t
@@ -89,8 +102,8 @@ def public_github(user: dict) -> dict:
         "name": gh.get("name"),
         "avatar_url": gh.get("avatar_url"),
         "missing_scopes": missing,
-        # Token present but unreadable (encryption key changed): must reconnect.
-        "needs_reconnect": decrypt(gh.get("token_enc", "")) is None,
+        # Token unreadable (encryption key changed) or rejected by GitHub: must reconnect.
+        "needs_reconnect": bool(gh.get("token_revoked_at")) or decrypt(gh.get("token_enc", "")) is None,
     }
 
 

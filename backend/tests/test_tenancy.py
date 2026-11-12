@@ -187,3 +187,46 @@ def test_legacy_data_goes_to_owner_of_legacy_account():
     impostor = tenant.Tenant(ObjectId(), 99, "legacyuser", "tok")
     github_account.adopt_legacy_data(impostor)
     assert "owner_id" not in db["repo_snapshots"].find_one({"name": "written-by-old-deploy"})
+
+
+# ── Token rejected by GitHub ─────────────────────────────────────────────────
+
+
+def _unauthorized():
+    import requests
+
+    resp = requests.Response()
+    resp.status_code = 401
+    return requests.HTTPError("401 Client Error: Unauthorized", response=resp)
+
+
+def test_rejected_token_asks_to_reconnect_and_is_skipped(client, monkeypatch):
+    _id = make_connected_user("uid-a", "a@x.com", 42, "alice")
+    t = github_account.tenant_for(database.get_db()["users"].find_one({"_id": _id}))
+
+    def boom():
+        raise _unauthorized()
+
+    monkeypatch.setattr(sync_runner, "_run_full_sync", lambda progress: boom())
+    with tenant.use(t), pytest.raises(Exception):
+        sync_runner.run_full_sync()
+
+    me = client.get("/api/auth/me", headers=h("uid-a", "a@x.com")).json()
+    assert me["github"]["needs_reconnect"] is True
+    assert list(github_account.iter_tenants()) == []  # scheduled syncs skip it
+    # GitHub data routes send the app to the reconnect screen... until they reconnect.
+    stub_viewer(monkeypatch)
+    client.post("/api/github/connect", json={"access_token": "gho_new_token_456"}, headers=h("uid-a", "a@x.com"))
+    me = client.get("/api/auth/me", headers=h("uid-a", "a@x.com")).json()
+    assert me["github"]["needs_reconnect"] is False
+    assert [x.github_login for x in github_account.iter_tenants()] == ["alice"]
+
+
+def test_cron_does_not_fail_for_a_rejected_token(monkeypatch):
+    from app import cron
+
+    make_connected_user("uid-a", "a@x.com", 42, "alice")
+    monkeypatch.setattr(cron, "ensure_indexes", lambda: None)
+    monkeypatch.setattr(cron, "run_full_sync", lambda: (_ for _ in ()).throw(_unauthorized()))
+    monkeypatch.setenv("MONGODB_URI", "mongodb://x")
+    cron.main()  # no SystemExit: a user needing to reconnect isn't a broken sync

@@ -9,8 +9,9 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .config import SYNC_INTERVAL_MINUTES
-from .github_account import iter_tenants
+from .github_account import iter_tenants, mark_token_revoked
 from .services.follower_service import sync_followers
+from .services.sync_runner import is_unauthorized
 from .services.sync_state import mark_synced
 from .tenant import use
 
@@ -28,8 +29,12 @@ def _run_follower_sync():
                 result = sync_followers()
                 mark_synced()
                 log.info("Scheduled follower sync for @%s: %s", tenant.github_login, result)
-            except Exception:
-                log.exception("Scheduled follower sync failed for @%s.", tenant.github_login)
+            except Exception as e:
+                if is_unauthorized(e):
+                    mark_token_revoked(tenant.user_id)
+                    log.warning("GitHub rejected @%s's token; they need to reconnect.", tenant.github_login)
+                else:
+                    log.exception("Scheduled follower sync failed for @%s.", tenant.github_login)
 
 
 def start_scheduler():
