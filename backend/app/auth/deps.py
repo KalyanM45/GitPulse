@@ -53,10 +53,12 @@ async def require_tenant(user: dict = Depends(require_user)):
     from ..github_account import tenant_for
     from ..tenant import set_current
 
-    if not (user.get("github") or {}).get("token_enc"):
+    gh = user.get("github") or {}
+    if not gh.get("token_enc"):
         _deny(409, "github_not_connected", "Connect your GitHub account to continue.")
     tenant = tenant_for(user)
-    if tenant is None:
+    # No token we can read, or one GitHub has rejected (see mark_token_revoked).
+    if tenant is None or gh.get("token_revoked_at"):
         _deny(409, "github_reconnect_required", "Reconnect your GitHub account to continue.")
     set_current(tenant)
     return tenant

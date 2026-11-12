@@ -230,3 +230,14 @@ def test_cron_does_not_fail_for_a_rejected_token(monkeypatch):
     monkeypatch.setattr(cron, "run_full_sync", lambda: (_ for _ in ()).throw(_unauthorized()))
     monkeypatch.setenv("MONGODB_URI", "mongodb://x")
     cron.main()  # no SystemExit: a user needing to reconnect isn't a broken sync
+
+
+def test_sync_button_reports_reconnect_and_data_routes_follow(client, monkeypatch):
+    make_connected_user("uid-a", "a@x.com", 42, "alice")
+    monkeypatch.setattr(sync_runner, "_run_full_sync", lambda progress: (_ for _ in ()).throw(_unauthorized()))
+
+    r = client.post("/api/sync", headers=h("uid-a", "a@x.com"))
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "github_reconnect_required"
+    r = client.get("/api/repos", headers=h("uid-a", "a@x.com"))
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "github_reconnect_required"
+    assert client.get("/api/auth/me", headers=h("uid-a", "a@x.com")).json()["github"]["needs_reconnect"] is True

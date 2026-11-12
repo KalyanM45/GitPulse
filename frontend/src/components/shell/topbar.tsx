@@ -10,6 +10,7 @@ import { useBasePath } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/overlays";
 import { Skeleton } from "@/components/ui/primitives";
+import { ApiError } from "@/lib/api";
 import { relativeTime } from "@/lib/format";
 import { useProfile, useSync, useSyncWatcher } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,7 @@ function Toast({ tone, children }: { tone: "ok" | "err"; children: React.ReactNo
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { data: profile, isLoading } = useProfile();
   const sync = useSync();
-  const { user, signOut } = useAuth();
+  const { user, signOut, reloadAppUser } = useAuth();
   // The demo is read-only: no Sync button there.
   const isDemo = useBasePath() === "/demo";
   // Mounted here because the Topbar is on every page of the app, so the watcher
@@ -67,8 +68,12 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         if (r.renamed) bits.push(`${r.renamed} renamed`);
         setToast({ tone: "ok", msg: `Synced — ${bits.join(" · ")}` });
       },
-      onError: (e) =>
-        setToast({ tone: "err", msg: e instanceof Error ? e.message : "Sync failed" }),
+      onError: (e) => {
+        setToast({ tone: "err", msg: e instanceof Error ? e.message : "Sync failed" });
+        // 409: GitHub rejected the token. Re-reading the account picks up
+        // needs_reconnect, and the app layout moves to the Reconnect GitHub screen.
+        if (e instanceof ApiError && e.status === 409) void reloadAppUser();
+      },
     });
   };
 

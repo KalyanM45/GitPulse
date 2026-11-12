@@ -160,7 +160,14 @@ export const api = {
 
   sync: async (): Promise<SyncResult> => {
     const res = await authFetch(`${apiRoot()}/sync`, { method: "POST" });
-    if (!res.ok) throw new ApiError(`Sync failed (${res.status})`, res.status);
+    if (!res.ok) {
+      const detail = await res
+        .json()
+        .then((b) => b?.detail)
+        .catch(() => null);
+      const message = typeof detail === "object" && detail?.message ? String(detail.message) : `Sync failed (${res.status})`;
+      throw new ApiError(message, res.status);
+    }
     return res.json() as Promise<SyncResult>;
   },
 };

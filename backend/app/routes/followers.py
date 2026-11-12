@@ -36,7 +36,13 @@ def trigger_sync():
         # `synced_at` lets the browser recognise this sync when it next polls
         # /api/sync-status and skip a redundant refresh.
         return sync_runner.run_full_sync()
-    except Exception:
+    except Exception as e:
+        if sync_runner.is_unauthorized(e):
+            # run_full_sync has flagged the connection; the app sends them to reconnect.
+            raise HTTPException(409, {
+                "code": "github_reconnect_required",
+                "message": "GitHub no longer accepts GitPulse's access. Reconnect your GitHub account.",
+            })
         log.exception("Manual sync failed")
         raise HTTPException(status_code=500, detail="Sync failed. Please try again.")
 
