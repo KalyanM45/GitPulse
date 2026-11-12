@@ -1,4 +1,4 @@
-"""Read-only demo (/demo/api/*): any signed-in account can view it (no invite
+"""Read-only demo (/demo/api/*): anyone can view it (no sign-in or invite
 needed), scoped to the demo account, GET only, private repositories hidden."""
 
 import time
@@ -126,10 +126,13 @@ def test_private_repos_shown_when_allowed(client, monkeypatch):
     assert names == ["public-repo", "secret-repo"]
 
 
-def test_demo_needs_sign_in_but_not_an_invite(client):
+def test_demo_needs_no_sign_in(client):
     seed()
-    assert client.get("/demo/api/repos", headers={}).status_code == 401
-    assert client.get("/demo/api/repos").status_code == 200  # not invited: still fine
+    r = client.get("/demo/api/repos", headers={})  # anonymous visitor
+    assert r.status_code == 200
+    assert [x["name"] for x in r.json()["data"]] == ["public-repo"]
+    assert client.get("/demo/api/repos").status_code == 200  # signed in, not invited: fine too
+    assert client.post("/demo/api/sync", headers={}).status_code == 403  # still read-only
 
 
 def test_uninvited_visitor_cannot_use_real_dashboard(client):

@@ -1,8 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, LogOut, Menu, RefreshCw, TriangleAlert } from "lucide-react";
+import { Check, LogIn, LogOut, Menu, RefreshCw, TriangleAlert } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useBasePath } from "@/lib/paths";
@@ -135,11 +136,20 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
               </a>
             ) : null}
 
-            <Tooltip content={user ? `Signed in as ${user.email}. Sign out` : "Sign out"}>
-              <Button variant="ghost" size="icon" onClick={() => signOut()} aria-label="Sign out" className="size-9">
-                <LogOut className="size-4" />
+            {user ? (
+              <Tooltip content={`Signed in as ${user.email}. Sign out`}>
+                <Button variant="ghost" size="icon" onClick={() => signOut()} aria-label="Sign out" className="size-9">
+                  <LogOut className="size-4" />
+                </Button>
+              </Tooltip>
+            ) : (
+              // Demo visitors who aren't signed in.
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/login">
+                  <LogIn className="size-4" /> Sign in
+                </Link>
               </Button>
-            </Tooltip>
+            )}
           </div>
         </div>
       </header>

@@ -13,7 +13,7 @@ The demo is the real dashboard, mounted a second time:
 |---|---|---|
 | Pages | `/dashboard`, `/audience`, `/repositories` | `/demo/dashboard`, … (the same components, re-exported) |
 | API | `/api/*` | `/demo/api/*` (the same routers, included again with a different guard) |
-| Guard | `require_tenant`: invited, own data | `require_demo_tenant`: any verified account, GET only, demo account's data |
+| Guard | `require_tenant`: invited, own data | `require_demo_tenant`: anyone (no sign-in), GET only, demo account's data |
 | Query cache | Persisted per browser | Separate and in memory only, so demo data never mixes with the visitor's own |
 
 The API client chooses `/api` or `/demo/api` from the current URL, so pages and
@@ -21,7 +21,7 @@ hooks need no demo-specific code.
 
 ## Guard rules (`backend/app/demo.py`)
 
-1. **Signed in:** a valid, verified Firebase token (`require_identity`); no invite needed.
+1. **Public:** no sign-in or invite needed.
 2. **Read-only:** any method other than GET → `403 demo_read_only`. This blocks
    sync endpoints and any future write route automatically.
 3. **Fixed tenant:** the data always belongs to `DEMO_GITHUB_LOGIN`, never the visitor.
@@ -46,14 +46,14 @@ The demo account is resolved once a minute (cached), not on every request.
 
 ## User experience
 
-- **View demo** on the landing page → sign in or sign up (the destination is
-  carried through verification) → the demo.
+- **View demo** on the landing page opens the demo directly; no sign-in.
 - A banner names whose dashboard it is and offers the next step: **Request access
   for your account** (not invited) or **Open my dashboard** (invited).
-- No Sync button, and no admin link.
+- No Sync button, and no admin link. Visitors who aren't signed in see **Sign in** in
+  place of Sign out.
 
 ## Verification
 
 `backend/tests/test_demo.py`: only the demo account's public repositories are
-visible, private ones are unreachable by name, writes are refused, sign-in is
-required but an invite isn't, and the real API still refuses uninvited visitors.
+visible, private ones are unreachable by name, writes are refused, no sign-in is
+needed, and the real API still refuses uninvited visitors.

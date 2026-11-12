@@ -29,7 +29,7 @@ services:
       - key: ADMIN_EMAILS
         sync: false
 
-      # Read-only demo of this GitHub account's dashboard at /demo (sign-in needed).
+      # Public read-only demo of this GitHub account's dashboard at /demo.
       - key: DEMO_GITHUB_LOGIN
         value: KalyanM45
       - key: DEMO_HIDE_PRIVATE_REPOS

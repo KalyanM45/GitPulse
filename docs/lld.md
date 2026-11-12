@@ -52,7 +52,7 @@ flowchart LR
     id --> usr[require_user<br/>invited? load user row]
     usr --> ten[require_tenant<br/>GitHub connected? set tenant]
     usr --> adm[require_admin<br/>email in ADMIN_EMAILS]
-    id --> demo[require_demo_tenant<br/>GET only, tenant = demo account]
+    req --> demo[require_demo_tenant<br/>no sign-in, GET only, tenant = demo account]
 ```
 
 | Guard | Fails with |

@@ -25,21 +25,15 @@ and schemas in the [LLD](lld.md).
 sequenceDiagram
     actor V as Visitor
     participant W as Web app
-    participant F as Firebase
     participant A as API
     V->>W: Click "View demo"
-    W->>W: Not signed in → /login?next=/demo/dashboard
-    V->>W: "Create an account" (next= is kept)
-    W->>F: Create account, send verification email
-    V->>F: Click the link in the email
-    W->>W: Verified → back to /demo/dashboard
-    W->>A: GET /demo/api/... (ID token)
-    A->>A: Valid token? GET only? Scope to the demo account, hide private repos
+    W->>A: GET /demo/api/... (no sign-in needed)
+    A->>A: GET only? Scope to the demo account, hide private repos
     A-->>W: Owner's dashboard data
     W-->>V: Read-only dashboard + banner "Request access for your account"
 ```
 
-- Works for **any** verified account, invited or not.
+- Open to **anyone**: no account or sign-in needed.
 - Read-only: no Sync button, and any non-GET request is refused by the API.
 - Private repositories of the demo account are filtered out on the server.
 
@@ -170,8 +164,8 @@ sequenceDiagram
 
 | Situation | Landing page | `/demo/*` | `/dashboard` |
 |---|---|---|---|
-| Not signed in | Request access, View demo, Sign in | → sign in, then back | → sign in, then back |
-| Email not verified | | → verify, then back | → verify |
+| Not signed in | Request access, View demo, Sign in | ✅ read-only demo | → sign in, then back |
+| Email not verified | | ✅ | → verify |
 | Signed in, not invited | | ✅ read-only demo | "Invite-only" screen: request form or "pending", plus a demo link |
 | Invited, GitHub not connected | | ✅ | → `/connect` |
 | Invited, first sync running | | ✅ | → `/connect` progress |

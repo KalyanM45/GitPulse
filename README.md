@@ -38,7 +38,7 @@ growing long after GitHub has forgotten it.
 
 GitPulse is in **invite-only beta**:
 
-- **Anyone** can sign in and explore a live, read-only demo of a real dashboard.
+- **Anyone** can explore a live, read-only demo of a real dashboard, no sign-in needed.
 - **Interested?** Request access from the landing page with a short note.
 - **Invited users** connect their GitHub account in one click and get their own private dashboard.
 
